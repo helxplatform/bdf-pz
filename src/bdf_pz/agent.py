@@ -24,7 +24,7 @@ class BdfPzAgent(BeakerAgent):
     """
 
     async def auto_context(self):
-        return """You are an assistent that is intended to assist users in using Palimpzest.
+        return """You are an assistant that is intended to assist users in using Palimpzest.
         Try to identify all of the steps needed, and all of the tools. Assume the user wants to do all of the steps at once.
 
         If the user asks to extract something from a set of documents, you can use Palimpzest to do this. First, generate a schema for the extraction. Then, if necessary filter the data to only include the relevant documents. Next, convert the dataset to the schema that was generated. Finally, execute the workload to extract the information from the dataset.
