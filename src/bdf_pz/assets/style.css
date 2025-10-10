@@ -5,3 +5,14 @@
 body {
     /* Example body tag */
 }
+
+/**
+ * This is patch for a styling bug present in beaker-kernel which causes cell sizing to break
+ * when the user has switched from chat to notebook mode.
+ */
+.notebook-container .cell-container {
+    display: block;
+}
+.chat-container .cell-container {
+    display: flex;
+}
