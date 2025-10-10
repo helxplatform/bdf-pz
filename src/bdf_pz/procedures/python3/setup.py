@@ -1,14 +1,78 @@
+import logging
 import palimpzest as pz
 import pandas as pd
-import time
 import os
-import IPython
 
 # formatter = IPython.get_ipython().display_formatter.formatters['text/plain']
 # formatter.max_seq_length = 0
 
-# set OPENAI_API_KEY environment variable based on OPENAI_API_KEY
-os.environ["OPENAI_API_KEY"] = "{{ OPENAI_API_KEY }}" 
+#####################
+# Setup environment #
+#####################
+if "{{ OPENAI_API_KEY }}": os.environ["OPENAI_API_KEY"] = "{{ OPENAI_API_KEY }}" 
+# For now, these are duplicated due to the usage of the `HOSTED` prefix in LiteLLM (used by Palimpzest).
+# The non-prefixed key will be used throughout for consistency as it is more universal.
+if "{{ VLLM_API_BASE }}":
+    VLLM_API_BASE = os.environ["VLLM_API_BASE"] = os.environ["HOSTED_VLLM_API_BASE"] = "{{ VLLM_API_BASE }}" 
+if "{{ VLLM_API_KEY }}":
+    VLLM_API_KEY = os.environ["VLLM_API_KEY"] = os.environ["HOSTED_VLLM_API_KEY"] = "{{ VLLM_API_KEY }}"
+if "{{ VLLM_LOAD_AVAILABLE_MODELS_RETRIES }}":
+    VLLM_LOAD_AVAILABLE_MODELS_RETRIES = os.environ["VLLM_LOAD_AVAILABLE_MODELS_RETRIES"] = "{{ VLLM_LOAD_AVAILABLE_MODELS_RETRIES }}"
+    VLLM_LOAD_AVAILABLE_MODELS_RETRIES = int(VLLM_LOAD_AVAILABLE_MODELS_RETRIES) if VLLM_LOAD_AVAILABLE_MODELS_RETRIES else None
+if "{{ VLLM_LOAD_AVAILABLE_MODELS_BACKOFF }}":
+    VLLM_LOAD_AVAILABLE_MODELS_BACKOFF = os.environ["VLLM_LOAD_AVAILABLE_MODELS_BACKOFF"] = "{{ VLLM_LOAD_AVAILABLE_MODELS_BACKOFF }}"
+    VLLM_LOAD_AVAILABLE_MODELS_BACKOFF = float(VLLM_LOAD_AVAILABLE_MODELS_BACKOFF) if VLLM_LOAD_AVAILABLE_MODELS_BACKOFF else None
+if "{{ LOG_LEVEL }}":
+    LOG_LEVEL = os.environ["LOG_LEVEL"] = "{{ LOG_LEVEL }}"
+
+VLLM_API_ENABLED = VLLM_API_BASE != ""
+
+#################
+# Setup logging #
+#################
+"""
+NOTE: Unhandled exceptions will terminate the setup process and should be logged rather than escalated unless setup cannot proceed.
+NOTE: Procedures execute as "__main__" and therefore will not inherit the package logger, so a handler needs to be configured.
+"""
+logging.basicConfig(
+    level=LOG_LEVEL,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
+
+############################################################
+# Setup locally available models from vLLM with Palimpzest #
+############################################################
+if VLLM_API_ENABLED:
+    """ Monkeypatch vLLM support and load available vLLM models into palimpzest. """
+    from bdf_pz.utils import setup_vllm_palimpzest
+    from bdf_pz.exceptions import VLLMNotConfiguredError, VLLMNotReachableError
+    try:
+        # `setup_vllm` may throw a few exceptions such as if vLLM environment vars are not configured,
+        # if it fails to reach the available model's endpoint, etc.
+        VLLM_PZ_MODELS = setup_vllm_palimpzest(
+            pz,
+            load_models_retries=VLLM_LOAD_AVAILABLE_MODELS_RETRIES,
+            load_models_backoff=VLLM_LOAD_AVAILABLE_MODELS_BACKOFF
+        )
+        logger.info("Successfully loaded vLLM into Palimpzest.")
+    # Instead of escalating, we should log as an exception if vLLM functionality failed to initialize.
+    except (VLLMNotConfiguredError, VLLMNotReachableError) as e:
+        # These errors are self-explanatory; don't need to include a full traceback (using `exc_info`).
+        logger.error(e)
+    except Exception as e:
+        logger.error("Failed to setup and load vLLM models into Palimpzest.", exc_info=e)
+
+    """ Check if models are available to use from environment """
+    ALL_PZ_MODELS_IN_ENV = pz.utils.model_helpers.get_models(include_embedding=True, use_vertex=True)
+    if len(ALL_PZ_MODELS_IN_ENV) == 0:
+        logger.warning("No models available for use from environment...")
+    else:
+        logger.info(f"Models available for use in Palimpzest from environment: { ", ".join(ALL_PZ_MODELS_IN_ENV) }")
+
+"""
+Misc. preconfigured dataset setup...
+"""
 
 # Represents a scientific research paper, which in practice is usually from a PDF file
 scientific_paper_schema = [
