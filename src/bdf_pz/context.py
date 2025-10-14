@@ -35,14 +35,6 @@ class BdfPzContext(BeakerContext):
         # For now, these are duplicated due to the use of the `HOSTED` prefix in LiteLLM.
         VLLM_API_BASE = os.environ.get("HOSTED_VLLM_API_BASE", os.environ.get("VLLM_API_BASE"))
         VLLM_API_KEY = os.environ.get("HOSTED_VLLM_API_KEY", os.environ.get("VLLM_API_KEY"))
-        VLLM_LOAD_AVAILABLE_MODELS_RETRIES = os.environ.get(
-            "HOSTED_VLLM_LOAD_AVAILABLE_MODELS_RETRIES",
-            os.environ.get("VLLM_LOAD_AVAILABLE_MODELS_RETRIES", 5)
-        )
-        VLLM_LOAD_AVAILABLE_MODELS_BACKOFF = os.environ.get(
-            "HOSTED_VLLM_LOAD_AVAILABLE_MODELS_BACKOFF",
-            os.environ.get("VLLM_LOAD_AVAILABLE_MODELS_BACKOFF", 0.25)
-        )
         LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
         
         command = "\n".join(
@@ -51,8 +43,6 @@ class BdfPzContext(BeakerContext):
                     "OPENAI_API_KEY": OPENAI_API_KEY,
                     "VLLM_API_BASE": VLLM_API_BASE,
                     "VLLM_API_KEY": VLLM_API_KEY,
-                    "VLLM_LOAD_AVAILABLE_MODELS_RETRIES": VLLM_LOAD_AVAILABLE_MODELS_RETRIES,
-                    "VLLM_LOAD_AVAILABLE_MODELS_BACKOFF": VLLM_LOAD_AVAILABLE_MODELS_BACKOFF,
                     "LOG_LEVEL": LOG_LEVEL
                 }.items() if v is not None })
             ]

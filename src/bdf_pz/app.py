@@ -1,4 +1,4 @@
-
+import os
 from beaker_kernel.lib.app import BeakerApp
 
 
@@ -51,3 +51,10 @@ class PalimpzestApp(BeakerApp):
           Let me know what you'd like to do so I can best assist you!</p>
         </div>""",
     }
+
+    def __init__(self):
+        super().__init__()
+        
+        if os.environ.get("DEBUG", "false") in ["true", "t", "1"]:
+            from langchain_core.globals import set_debug
+            set_debug(True)

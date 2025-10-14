@@ -3,9 +3,7 @@ import os
 import importlib
 import requests
 from typing import Optional
-from bdf_pz.exceptions import VLLMNotConfiguredError, VLLMNotReachableError
-from requests.adapters import HTTPAdapter, Retry
-from requests.exceptions import RequestException
+from openai import OpenAI
 from palimpzest.constants import Model as ModelType
 from aenum import extend_enum
 
@@ -84,9 +82,7 @@ def register_vllm_models_pz(palimpzest_module, models: list[dict]) -> list[Model
     return vllm_models
 
 def setup_vllm_palimpzest(
-    palimpzest_module, # i.e., the top-level import of the palimpzest package.
-    load_models_retries: Optional[int]=5,
-    load_models_backoff: Optional[int]=0.25
+    palimpzest_module # i.e., the top-level import of the palimpzest package.
 ) -> list[ModelType]:
     monkeypatch_vllm_palimpzest(palimpzest_module)
 
@@ -96,48 +92,13 @@ def setup_vllm_palimpzest(
         if not vllm_base_url.endswith("/"):
             vllm_base_url += "/"
     except KeyError:
-        raise VLLMNotConfiguredError
-    
-    """
-    NOTE: This entire block could be replaced by using the `openai.OpenAI` client, using `client.models.list()`.
-    This allows less granular control over how the request is executed though (particularly retrying functionality). 
-    """
-    sess = requests.Session()
-    if load_models_retries is not None or load_models_backoff is not None:
-        retry = Retry(total=load_models_retries, backoff_factor=load_models_backoff, status_forcelist=[500, 502, 503, 504])
-        sess.mount(vllm_base_url, HTTPAdapter(max_retries=retry))
+        logger.warning("No vLLM URL has been configured; vLLM models will be unavailable.")
+        return []
         
-    sess.headers.update({
-        "Authorization": f"Bearer { vllm_api_key }",
-        "Content-Type": "application/json"
-    })
     logger.debug("Attempting to fetch available vLLM models")
     # Get available models
-    try:
-        res = sess.get(f"{ vllm_base_url }models")
-        res.raise_for_status()
-    except RequestException as e:
-        if e.response:
-            raise VLLMNotReachableError(
-                f"Failed to retrieve models from vLLM instance at { vllm_base_url }models. "
-                "Please ensure the vLLM server is running and accessible. "
-                "You can configure retry behavior by setting VLLM_LOAD_AVAILABLE_MODELS_RETRIES/VLLM_LOAD_AVAILABLE_MODELS_BACKOFF. These may also be prefixed with `HOSTED_`.\n"
-                "Status: {e.response.status_code}\nBody: {e.response.text}"
-            )
-        else:
-            raise VLLMNotReachableError(
-                f"Failed to retrieve models from vLLM instance at { vllm_base_url }models. "
-                "Please ensure the vLLM server is running and accessible. "
-                "You can configure retry behavior by setting VLLM_LOAD_AVAILABLE_MODELS_RETRIES/VLLM_LOAD_AVAILABLE_MODELS_BACKOFF. These may also be prefixed with `HOSTED_`."
-            )
-    except Exception as e:
-        raise e
-        # raise Exception(
-        #     f"Failed to retrieve models from vLLM instance at { vllm_base_url }models. "
-        #     "Please ensure the vLLM server is running and accessible. "
-        #     "You can configure retry behavior by setting VLLM_LOAD_AVAILABLE_MODELS_RETRIES/VLLM_LOAD_AVAILABLE_MODELS_BACKOFF. These may also be prefixed with `HOSTED_`."
-        # ) from e
-    models = res.json()["data"]
+    client = OpenAI(api_key=vllm_api_key or "<null>", base_url=vllm_base_url)
+    models = [model.to_dict() for model in client.models.list().data]
 
     pz_models = register_vllm_models_pz(palimpzest_module, models)
     for model in pz_models:

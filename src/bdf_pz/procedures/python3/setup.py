@@ -13,19 +13,11 @@ if "{{ OPENAI_API_KEY }}": os.environ["OPENAI_API_KEY"] = "{{ OPENAI_API_KEY }}"
 # For now, these are duplicated due to the usage of the `HOSTED` prefix in LiteLLM (used by Palimpzest).
 # The non-prefixed key will be used throughout for consistency as it is more universal.
 if "{{ VLLM_API_BASE }}":
-    VLLM_API_BASE = os.environ["VLLM_API_BASE"] = os.environ["HOSTED_VLLM_API_BASE"] = "{{ VLLM_API_BASE }}" 
+    os.environ["VLLM_API_BASE"] = os.environ["HOSTED_VLLM_API_BASE"] = "{{ VLLM_API_BASE }}" 
 if "{{ VLLM_API_KEY }}":
-    VLLM_API_KEY = os.environ["VLLM_API_KEY"] = os.environ["HOSTED_VLLM_API_KEY"] = "{{ VLLM_API_KEY }}"
-if "{{ VLLM_LOAD_AVAILABLE_MODELS_RETRIES }}":
-    VLLM_LOAD_AVAILABLE_MODELS_RETRIES = os.environ["VLLM_LOAD_AVAILABLE_MODELS_RETRIES"] = "{{ VLLM_LOAD_AVAILABLE_MODELS_RETRIES }}"
-    VLLM_LOAD_AVAILABLE_MODELS_RETRIES = int(VLLM_LOAD_AVAILABLE_MODELS_RETRIES) if VLLM_LOAD_AVAILABLE_MODELS_RETRIES else None
-if "{{ VLLM_LOAD_AVAILABLE_MODELS_BACKOFF }}":
-    VLLM_LOAD_AVAILABLE_MODELS_BACKOFF = os.environ["VLLM_LOAD_AVAILABLE_MODELS_BACKOFF"] = "{{ VLLM_LOAD_AVAILABLE_MODELS_BACKOFF }}"
-    VLLM_LOAD_AVAILABLE_MODELS_BACKOFF = float(VLLM_LOAD_AVAILABLE_MODELS_BACKOFF) if VLLM_LOAD_AVAILABLE_MODELS_BACKOFF else None
+    os.environ["VLLM_API_KEY"] = os.environ["HOSTED_VLLM_API_KEY"] = "{{ VLLM_API_KEY }}"
 if "{{ LOG_LEVEL }}":
     LOG_LEVEL = os.environ["LOG_LEVEL"] = "{{ LOG_LEVEL }}"
-
-VLLM_API_ENABLED = VLLM_API_BASE != ""
 
 #################
 # Setup logging #
@@ -43,23 +35,15 @@ logger = logging.getLogger(__name__)
 ############################################################
 # Setup locally available models from vLLM with Palimpzest #
 ############################################################
-if VLLM_API_ENABLED:
+if os.environ.get("VLLM_API_BASE", "") != "":
     """ Monkeypatch vLLM support and load available vLLM models into palimpzest. """
     from bdf_pz.utils import setup_vllm_palimpzest
-    from bdf_pz.exceptions import VLLMNotConfiguredError, VLLMNotReachableError
     try:
         # `setup_vllm` may throw a few exceptions such as if vLLM environment vars are not configured,
         # if it fails to reach the available model's endpoint, etc.
-        VLLM_PZ_MODELS = setup_vllm_palimpzest(
-            pz,
-            load_models_retries=VLLM_LOAD_AVAILABLE_MODELS_RETRIES,
-            load_models_backoff=VLLM_LOAD_AVAILABLE_MODELS_BACKOFF
-        )
+        VLLM_PZ_MODELS = setup_vllm_palimpzest(pz)
         logger.info("Successfully loaded vLLM into Palimpzest.")
     # Instead of escalating, we should log as an exception if vLLM functionality failed to initialize.
-    except (VLLMNotConfiguredError, VLLMNotReachableError) as e:
-        # These errors are self-explanatory; don't need to include a full traceback (using `exc_info`).
-        logger.error(e)
     except Exception as e:
         logger.error("Failed to setup and load vLLM models into Palimpzest.", exc_info=e)
 

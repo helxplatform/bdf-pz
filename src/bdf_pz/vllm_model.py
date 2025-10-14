@@ -10,15 +10,12 @@ from langchain_core.tools import BaseTool
 from langchain_core.messages import BaseMessage
 from langchain_core.language_models import BaseChatModel
 from langchain_openai.chat_models import ChatOpenAI
-from openai import AuthenticationError as OpenAIAuthenticationError, APIError, APIConnectionError, RateLimitError, OpenAIError, BadRequestError
+from openai import OpenAI, AuthenticationError as OpenAIAuthenticationError, APIError, APIConnectionError, RateLimitError, OpenAIError, BadRequestError
 from transformers import AutoTokenizer
 
 from archytas.models.base import BaseArchytasModel
 from archytas.message_schemas import ToolUseRequest
 from archytas.exceptions import AuthenticationError, ExecutionError, ContextWindowExceededError
-
-from langchain_core.globals import set_debug
-set_debug(True)
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +30,10 @@ class ChatVLLM(ChatOpenAI):
             Sequence[Union[dict[str, Any], type, Callable, BaseTool]]
         ] = None,
     ) -> int:
+        # vLLM only supports tokenizing string prompts, not message lists (despite allowing completions against them).
+        # vLLM also has no support for converting a message list into a prompt, so we are effectively required to just
+        # make a best guess as to what the prompt string vLLM generates will look like. 
+        # payload = self._get_request_payload(messages)
         return BaseChatModel.get_num_tokens_from_messages(self, messages, tools)
 
 class VLLMModel(BaseArchytasModel):
@@ -128,31 +129,16 @@ class VLLMModel(BaseArchytasModel):
         
         self.base_url = base_url
 
-    """
-    def load_available_models(self) -> None:
-        client = OpenAI(base_url=self.base_url, api_key=self.api_key)
-        self.vllm_models = [model.to_dict() for model in client.models.list()]
-        if len(self.vllm_models) == 0:
-            raise RuntimeError(f"No models are available under the vLLM instance at { self.base_url }.")
-    """
-
     def load_available_models(self) -> None:
         # Get available models
-        try:
-            res = requests.get(f"{ self.base_url }models", headers={
-                "Authorization": f"Bearer { self.api_key }",
-                "Content-Type": "application/json"
-            })
-            res.raise_for_status()
-        except RequestException as e:
-            if e.response:
-                raise RequestException(f"Failed to retrieve models from vLLM instance at { self.base_url }models. Please ensure the vLLM server is running and accessible.\nStatus: {e.response.status_code}\nBody: {e.response.text}")
-            else:
-                raise RequestException(f"Failed to retrieve models from vLLM instance at { self.base_url }models. Please ensure the vLLM server is running and accessible. Request failed to send: { e }")
-        except Exception as e:
-            raise RuntimeError(f"Failed to retrieve models from vLLM instance at { self.base_url }models. Please ensure the vLLM server is running and accessible. Error: {e}")
         
-        self.vllm_models = res.json()["data"]
+        try:
+            client = OpenAI(api_key=self.api_key, base_url=self.base_url)
+            self.vllm_models = [model.to_dict() for model in client.models.list().data]
+        except Exception as e:
+            logger.error(f"Failed to retrieve models from vLLM instance at { self.base_url }models. Please ensure the vLLM server is running and accessible.")
+            raise e
+
         if len(self.vllm_models) == 0:
             raise RuntimeError(f"No models are available under the vLLM instance at { self.base_url }.")
         
