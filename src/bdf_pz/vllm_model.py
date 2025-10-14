@@ -12,6 +12,7 @@ from langchain_core.language_models import BaseChatModel
 from langchain_openai.chat_models import ChatOpenAI
 from openai import OpenAI, AuthenticationError as OpenAIAuthenticationError, APIError, APIConnectionError, RateLimitError, OpenAIError, BadRequestError
 from transformers import AutoTokenizer
+from urllib.parse import urljoin
 
 from archytas.models.base import BaseArchytasModel
 from archytas.message_schemas import ToolUseRequest
@@ -23,6 +24,11 @@ logger = logging.getLogger(__name__)
 DEFERRED_TOKEN_VALUE = "***deferred***"
 
 class ChatVLLM(ChatOpenAI):
+    @property
+    def vllm_api_base(self) -> str | None:
+        if self.openai_api_base is None: return None
+        return urljoin(self.openai_api_base, "..")
+
     def get_num_tokens_from_messages(
         self,
         messages: list[BaseMessage],
@@ -30,11 +36,26 @@ class ChatVLLM(ChatOpenAI):
             Sequence[Union[dict[str, Any], type, Callable, BaseTool]]
         ] = None,
     ) -> int:
-        # vLLM only supports tokenizing string prompts, not message lists (despite allowing completions against them).
-        # vLLM also has no support for converting a message list into a prompt, so we are effectively required to just
-        # make a best guess as to what the prompt string vLLM generates will look like. 
-        # payload = self._get_request_payload(messages)
-        return BaseChatModel.get_num_tokens_from_messages(self, messages, tools)
+        payload = self._get_request_payload(messages)
+        try:
+            res = requests.post(
+                f"{ self.vllm_api_base }tokenize",
+                headers={
+                    "Authorization": f"Bearer { self.openai_api_key }",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": self.model_name,
+                    "messages": payload.get("messages"),
+                    "tools": payload.get("tools")
+                }
+            )
+            res.raise_for_status()
+            return res.json()["count"]
+        except Exception as e:
+            logger.error(f"Failed to tokenize messages using vLLM endpoint. Falling back to base tokenizer. Error: { e }")
+            return BaseChatModel.get_num_tokens_from_messages(self, messages, tools)
+        
 
 class VLLMModel(BaseArchytasModel):
     api_key: Optional[str] = None
