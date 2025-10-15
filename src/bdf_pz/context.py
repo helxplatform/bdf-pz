@@ -102,3 +102,18 @@ class BasicContext(BeakerContext):
         You are an assistant helping users work effectively within Jupyter Notebooks. 
         You provide guidance, code suggestions, and help with data analysis, visualization, and other notebook-based tasks.
         """.strip()
+    
+    async def generate_preview(self):
+        """
+        Preview what exists in the subkernel.
+        """
+        fetch_state_code = self.subkernel.FETCH_STATE_CODE
+        result = await self.evaluate(fetch_state_code)
+        state = result.get("return", None)
+        return {
+            "x-application/beaker-subkernel-state": {
+                "state": {
+                    "application/json": state or {}
+                }
+            },
+        }
