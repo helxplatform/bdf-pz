@@ -8,7 +8,7 @@ import logging
 from beaker_kernel.lib import BeakerContext
 from beaker_kernel.lib.utils import action
 
-from .agent import BdfPzAgent
+from .agent import BdfPzAgent, BasicAgent
 
 if TYPE_CHECKING:
     from beaker_kernel.kernel import BeakerKernel
@@ -22,6 +22,7 @@ class BdfPzContext(BeakerContext):
 
     compatible_subkernels = ["python3"]
     SLUG = "bdf-pz"
+    WEIGHT = 0
 
     def __init__(self, beaker_kernel: "BeakerKernel", config: Dict[str, Any]):
         super().__init__(beaker_kernel, BdfPzAgent, config)
@@ -84,3 +85,20 @@ class BdfPzContext(BeakerContext):
             You are an assistant helping biomedical researchers users the Palimpzest library to extract references from scientific papers.
             """.strip()
 
+
+class BasicContext(BeakerContext):
+    """
+    Basic context for generalized usage of an agent
+    """
+    compatible_subkernels = ["python3"]
+    SLUG = "basic"
+    WEIGHT = 1
+
+    def __init__(self, beaker_kernel: "BeakerKernel", config: Dict[str, Any]):
+        super().__init__(beaker_kernel, BasicAgent, config)
+
+    async def auto_context(self):
+        return f"""
+        You are an assistant helping users work effectively within Jupyter Notebooks. 
+        You provide guidance, code suggestions, and help with data analysis, visualization, and other notebook-based tasks.
+        """.strip()

@@ -40,7 +40,9 @@ dependencies = [
   # This can lead to version incompatibility between tree sitter and the installed python grammar.
   "tree-sitter<0.25.0",
   # For now, locking python grammar to <0.25 as well to ensure no version mismatch.
-  "tree-sitter-python<0.25.0"
+  "tree-sitter-python<0.25.0",
+  "palimpzest@git+https://github.com/mitdbg/palimpzest.git@main"
+
 ]
 
 [project.urls]
