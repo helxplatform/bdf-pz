@@ -98,7 +98,11 @@ def setup_vllm_palimpzest(
     logger.debug("Attempting to fetch available vLLM models")
     # Get available models
     client = OpenAI(api_key=vllm_api_key or "<null>", base_url=vllm_base_url)
-    models = [model.to_dict() for model in client.models.list().data]
+    try:
+        models = [model.to_dict() for model in client.models.list().data]
+    except Exception as e:
+        logger.error(f"Failed to retrieve models from vLLM instance at { vllm_base_url }models. Please ensure the vLLM server is running and accessible.")
+        raise e
 
     pz_models = register_vllm_models_pz(palimpzest_module, models)
     for model in pz_models:
