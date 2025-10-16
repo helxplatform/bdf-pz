@@ -65,7 +65,7 @@ def register_vllm_models_pz(palimpzest_module, models: list[dict]) -> list[Model
         # Register the model enum in palimpzest
         raw_model_id = model["id"]
         model_id = f"hosted_vllm/{ raw_model_id }"
-        model_name = f"VLLM_{ raw_model_id.split("/")[-1].replace("-", "_").replace(".", "_").upper() }"
+        model_name = "VLLM_" + raw_model_id.split("/")[-1].replace("-", "_").replace(".", "_").upper()
         extend_enum(palimpzest_module.constants.Model, model_name, model_id)
 
         # Register the model cost/performance metrics. This info isn't available from vLLM.
