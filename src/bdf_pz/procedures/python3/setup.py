@@ -2,6 +2,7 @@ import logging
 import palimpzest as pz
 import pandas as pd
 import os
+from bdf_pz.utils import setup_palimpzest
 
 # formatter = IPython.get_ipython().display_formatter.formatters['text/plain']
 # formatter.max_seq_length = 0
@@ -9,7 +10,16 @@ import os
 #####################
 # Setup environment #
 #####################
-if "{{ OPENAI_API_KEY }}": os.environ["OPENAI_API_KEY"] = "{{ OPENAI_API_KEY }}" 
+if "{{ AZURE_OPENAI_API_KEY }}":
+    # OPENAI_API_KEY needs to be set to something in order to be recognized as enabled by Palimpzest.
+    os.environ["OPENAI_API_KEY"] = "<null>"
+    os.environ["AZURE_OPENAI_KEY"] = os.environ["AZURE_OPENAI_API_KEY"] = "{{ AZURE_OPENAI_API_KEY }}"
+    os.environ["AZURE_OPENAI_ENDPOINT"] = "{{ AZURE_OPENAI_ENDPOINT }}"
+    os.environ["AZURE_OPENAI_DEPLOYMENT"] = "{{ AZURE_OPENAI_DEPLOYMENT }}"
+
+elif "{{ OPENAI_API_KEY }}": os.environ["OPENAI_API_KEY"] = "{{ OPENAI_API_KEY }}" 
+
+if "{{ GEMINI_API_KEY }}": os.environ["GEMINI_API_KEY"] = "{{ GEMINI_API_KEY }}" 
 # For now, these are duplicated due to the usage of the `HOSTED` prefix in LiteLLM (used by Palimpzest).
 # The non-prefixed key will be used throughout for consistency as it is more universal.
 if "{{ VLLM_API_BASE }}":
@@ -32,27 +42,24 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-############################################################
-# Setup locally available models from vLLM with Palimpzest #
-############################################################
-if os.environ.get("VLLM_API_BASE", "") != "":
-    """ Monkeypatch vLLM support and load available vLLM models into palimpzest. """
-    from bdf_pz.utils import setup_vllm_palimpzest
-    try:
-        # `setup_vllm` may throw a few exceptions such as if vLLM environment vars are not configured,
-        # if it fails to reach the available model's endpoint, etc.
-        VLLM_PZ_MODELS = setup_vllm_palimpzest(pz)
-        logger.info("Successfully loaded vLLM into Palimpzest.")
-    # Instead of escalating, we should log as an exception if vLLM functionality failed to initialize.
-    except Exception as e:
-        logger.error("Failed to setup and load vLLM models into Palimpzest.", exc_info=e)
+###########################################################################################################
+# Setup locally available models from vLLM with Palimpzest. Patch flaws with Palimpzest (if running v0.7) #
+###########################################################################################################
+try:
+    setup_palimpzest()
 
     """ Check if models are available to use from environment """
-    ALL_PZ_MODELS_IN_ENV = pz.utils.model_helpers.get_models(include_embedding=True, use_vertex=True)
+    ALL_PZ_MODELS_IN_ENV = pz.utils.model_helpers.get_models(include_embedding=True)
     if len(ALL_PZ_MODELS_IN_ENV) == 0:
         logger.warning("No models available for use from environment...")
     else:
         logger.info(f"Models available for use in Palimpzest from environment: { ", ".join(ALL_PZ_MODELS_IN_ENV) }")
+
+except Exception as e:
+    # Instead of escalating, we should log as an exception if vLLM functionality failed to initialize.
+    logger.error("Failed to setup Palimpzest.", exc_info=e)
+
+    
 
 """
 Misc. preconfigured dataset setup...
