@@ -3,6 +3,7 @@ import json
 import os
 import requests
 import httpx
+import litellm
 from typing import Optional, Sequence, Union, Any, Callable
 from typing_extensions import Self
 from functools import cached_property
@@ -14,10 +15,9 @@ from openai import (
     OpenAI, AsyncOpenAI, AuthenticationError as OpenAIAuthenticationError, APIError,
     APIConnectionError, RateLimitError, OpenAIError, BadRequestError
 )
+from openai.types.chat import ChatCompletion
 from openai._models import FinalRequestOptions
 from openai._utils import is_mapping
-from transformers import AutoTokenizer
-from urllib.parse import urljoin
 
 from archytas.models.base import BaseArchytasModel
 from archytas.message_schemas import ToolUseRequest
@@ -78,7 +78,7 @@ class AzureOpenAIProxyMixin:
             if not options.headers:
                 options.headers = {}
             options.headers["Authorization"] = f"Bearer { self.api_key }"
-            
+
             options.params["modelTypeName"] = model_type_name
             options.params["request"] = json.dumps(messages)
         else:
@@ -152,6 +152,43 @@ class ChatAzureOpenAIProxy(ChatOpenAI):
             self.async_client = self.root_async_client.chat.completions
 
         return self
+    
+class LiteLLMAzureOpenAIProxy(litellm.CustomLLM):
+    def __init__(
+        self,
+        api_key: str | None=None,
+        base_url: str | None = None
+    ):
+        super().__init__()
+        self.client = AzureOpenAIProxy(api_key=api_key, base_url=base_url)
+        self.aclient = AsyncAzureOpenAIProxy(api_key=api_key, base_url=base_url)
+
+    def completion(self, model: str, messages: list = [], **kwargs):
+        res = self.client.chat.completions.create(
+            messages=messages,
+            model=model
+        )
+        return self.openai_to_litellm_completion(res)
+
+    async def acompletion(self, model: str, messages: list = [], **kwargs):
+        res = await self.aclient.chat.completions.create(
+            messages=messages,
+            model=model
+        )
+        return self.openai_to_litellm_completion(res)
+    
+    @staticmethod
+    def openai_to_litellm_completion(completion: ChatCompletion) -> litellm.ModelResponse:
+        return litellm.ModelResponse(
+            id=completion.id,
+            choices=[choice.model_dump() for choice in completion.choices],
+            created=completion.created,
+            model=completion.model,
+            object=completion.object,
+            system_fingerprint=completion.system_fingerprint,
+            usage=completion.usage.model_dump() if completion.usage else None
+        )
+        
     
 
 class AzureOpenAIProxyModel(BaseArchytasModel):

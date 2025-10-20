@@ -1,0 +1,71 @@
+# A schema for custom models that we support loading via vLLM/Azure OpenAI proxy 
+vllm-gemma-3-model:
+  id: hosted_vllm/google/gemma-3-1b-it
+  name: VLLM_GEMMA_3_1B_IT
+  card:
+    usd_per_input_token: 0.0
+    usd_per_output_token: 0.0
+    seconds_per_output_token: 0
+    overall: 0
+  capabilities:
+    reasoning: true
+    text: true
+    vision: false
+    audio: false
+    embedding: false
+vllm-llama-3-model:
+  id: hosted_vllm/meta-llama/Meta-Llama-3.1-8B-Instruct
+  name: VLLM_LLAMA_3_1_8B_INSTRUCT
+  card:
+    usd_per_input_token: 0.0
+    usd_per_output_token: 0.0
+    seconds_per_output_token: 0
+    overall: 0
+  capabilities:
+    reasoning: true
+    text: true
+    vision: false
+    audio: false
+    embedding: false
+azure-gpt-4o-mini:
+  id: azure-openai-proxy/gpt-4o-mini
+  name: AZURE_GPT_4o_MINI
+  card:
+    usd_per_input_token: 1.5e-7
+    usd_per_output_token: 6.0e-7
+    seconds_per_output_token: 0
+    overall: 0
+  capabilities:
+    reasoning: true
+    text: true
+    vision: true
+    audio: false
+    embedding: false
+azure-gpt-4.1:
+  id: azure-openai-proxy/gpt-4.1
+  name: AZURE_GPT_4_1
+  card:
+    usd_per_input_token: 2.0e-6
+    usd_per_output_token: 8.0e-6
+    seconds_per_output_token: 0
+    overall: 0
+  capabilities:
+    reasoning: false
+    text: true
+    vision: true
+    audio: false
+    embedding: false
+azure-o1-mini:
+  id: azure-openai-proxy/o1-mini
+  name: AZURE_o1_MINI
+  card:
+    usd_per_input_token: 1.1e-6
+    usd_per_output_token: 5.5e-7
+    seconds_per_output_token: 0
+    overall: 0
+  capabilities:
+    reasoning: true
+    text: true
+    vision: false
+    audio: false
+    embedding: false
