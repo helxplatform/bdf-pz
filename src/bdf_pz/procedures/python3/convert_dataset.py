@@ -6,6 +6,9 @@ cardinality = pz.Cardinality.ONE_TO_MANY if cardinality_str == "one_to_many" els
 
 #assert dataset exists in scope
 assert "dataset" in locals(), "Dataset should be defined in the current scope. Please set the input dataset first."
-dataset = dataset.sem_add_columns(convert_schema, cardinality=cardinality)
+if cardinality == pz.Cardinality.ONE_TO_MANY:
+    dataset = dataset.sem_flat_map(convert_schema)
+else:
+    dataset = dataset.sem_map(convert_schema)
 
 dataset

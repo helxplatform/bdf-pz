@@ -323,8 +323,10 @@ class BdfPzAgent(BeakerAgent):
 
         """
 
+        # Note: this tool could likely be removed completely?
+        # Maybe it is relevant to the generation of model context.
         code = agent.context.get_code(
-            "override_dataset",
+            "set_input_dataset",
             {
                 "dataset_name": dataset_name,
             },
@@ -466,7 +468,6 @@ class BdfPzAgent(BeakerAgent):
         output_dataset: str,
         policy_method: str,
         allow_code_synth: str,
-        allow_token_reduction: str,
         agent: AgentRef,
         loop: LoopControllerRef,
     ) -> str:
@@ -478,14 +479,13 @@ class BdfPzAgent(BeakerAgent):
 
         The policy method chosen is either to minimize the extraction cost or to maximize the quality
         of the extraction.
-        The allow_code_synth and allow_token_reduction are flags that allow the system to use optimization strategies, repsectively to run on synthesized code and to reduce the tokens used when calling LLMs.
+        The allow_code_synth flag enables the system to use optimization strategies that involve running synthesized code.
         This returns the extractions as a Pandas DataFrame.
 
         Args:
-            output_dataset (str): An output dataset on which to run the workload.
+            output_dataset (str): The dataset to execute the workload using.
             policy_method (str): Either "min_cost" or "max_quality". Defaults to "max_quality".
             allow_code_synth (str): Whether to allow code synthesis or not. Defaults to "False".
-            allow_token_reduction (str): Whether to allow token reduction or not. Defaults to "False".
 
         Returns:
             str: returns the extracted references as a Pandas DataFrame called `results_df`.
@@ -499,8 +499,7 @@ class BdfPzAgent(BeakerAgent):
             {
                 "output_dataset": output_dataset,
                 "policy_method": policy_method,
-                "allow_code_synth": allow_code_synth,
-                "allow_token_reduction": allow_token_reduction,
+                "allow_code_synth": allow_code_synth
             },
         )
         if PRINT_OUTPUT:

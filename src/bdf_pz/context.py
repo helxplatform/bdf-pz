@@ -42,7 +42,9 @@ class BdfPzContext(BeakerContext):
         AZURE_OPENAI_ENDPOINT = os.environ.get("AZURE_OPENAI_ENDPOINT")
         AZURE_OPENAI_DEPLOYMENT = os.environ.get("AZURE_OPENAI_DEPLOYMENT")
         # This is used as a bearer token for the proxy. `AZURE_OPENAI_API_KEY` is also supported in case.
-        AZURE_OPENAI_API_KEY = os.environ.get("AZURE_OPENAI_API_KEY", os.environ.get("AZURE_OPENAI_KEY")) 
+        AZURE_OPENAI_API_KEY = os.environ.get("AZURE_OPENAI_API_KEY", os.environ.get("AZURE_OPENAI_KEY"))
+
+        PZ_PREFERRED_MODELS = os.environ.get("PZ_PREFERRED_MODELS")
 
         LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
         
@@ -56,6 +58,7 @@ class BdfPzContext(BeakerContext):
                     "AZURE_OPENAI_API_KEY": AZURE_OPENAI_API_KEY,
                     "VLLM_API_BASE": VLLM_API_BASE,
                     "VLLM_API_KEY": VLLM_API_KEY,
+                    "PZ_PREFERRED_MODELS": PZ_PREFERRED_MODELS,
                     "LOG_LEVEL": LOG_LEVEL
                 }.items() if v is not None })
             ]
