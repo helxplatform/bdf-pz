@@ -1,5 +1,12 @@
 import os
 
+if "dataset" not in locals():
+    output = "{{ output_dataset }}"
+else:
+    output = dataset
+
+assert isinstance(output, pz.Dataset), "Output should be a Dataset object"
+
 policy_method = "{{ policy_method }}"
 
 if policy_method == "min_cost":
@@ -37,7 +44,7 @@ config = pz.QueryProcessorConfig(
     progress=False,
     allow_code_synth={{ allow_code_synth }},
     # RAG currently only works when OpenAI has been configured.
-    allow_rag_reduction=os.environ.get("OPENAI_API_KEY") != "",
+    allow_rag_reduction=os.environ.get("OPENAI_API_KEY", "") != "",
     # Mixture of Agents disabled for now. More costly and takes far longer to execute.
     allow_mixtures=False,
     available_models=available_models
