@@ -6,7 +6,7 @@ import httpx
 import litellm
 from typing import Optional, Sequence, Union, Any, Callable
 from typing_extensions import Self
-from functools import cached_property
+from functools import cached_property, lru_cache
 from pydantic import SecretStr, Field, model_validator
 from langchain_core.utils.utils import secret_from_env
 from langchain_openai.chat_models import ChatOpenAI
@@ -265,3 +265,16 @@ class AzureOpenAIProxyModel(BaseArchytasModel):
             raise ContextWindowExceededError(error.body.get('message', None)) from error
         else:
             raise error
+        
+    @lru_cache()
+    def contextsize(self, model_name = None):
+        if model_name is None:
+            model_name = self.model_name
+        
+        try:
+            cost = litellm.model_cost[model_name]
+            return cost["max_input_tokens"]
+        except KeyError:
+            logger.warning(f"Could not load context size for '{ self.model_name }' from LiteLLM.")
+            # Just guess. Beaker will break if None is returned.
+            return 2**16

@@ -243,4 +243,5 @@ Be sure to always use the `final_answer` tool to report back to the user.
         except KeyError:
             logger.warning(f"Could not load context size for '{ self.model_name }' from vLLM spec.")
             logger.debug(json.dumps(model_spec, indent=2))
-            return None
+            # Just guess. Beaker will break if None is returned.
+            return 2**16

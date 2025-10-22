@@ -10,11 +10,9 @@ from bdf_pz.utils import setup_palimpzest
 #####################
 # Setup environment #
 #####################
-if "{{ AZURE_OPENAI_API_KEY }}":
-    os.environ["AZURE_OPENAI_KEY"] = os.environ["AZURE_OPENAI_API_KEY"] = "{{ AZURE_OPENAI_API_KEY }}"
-    os.environ["AZURE_OPENAI_ENDPOINT"] = "{{ AZURE_OPENAI_ENDPOINT }}"
-    os.environ["AZURE_OPENAI_DEPLOYMENT"] = "{{ AZURE_OPENAI_DEPLOYMENT }}"
-if "{{ OPENAI_API_KEY }}": os.environ["OPENAI_API_KEY"] = "{{ OPENAI_API_KEY }}" 
+if "{{ OPENAI_API_KEY }}": os.environ["OPENAI_API_KEY"] = "{{ OPENAI_API_KEY }}"
+if "{{ OPENAI_API_BASE }}":
+    os.environ["OPENAI_API_BASE"] = os.environ["OPENAI_BASE_URL"] = "{{ OPENAI_API_BASE }}"
 if "{{ GEMINI_API_KEY }}": os.environ["GEMINI_API_KEY"] = "{{ GEMINI_API_KEY }}" 
 # For now, these are duplicated due to the usage of the `HOSTED` prefix in LiteLLM (used by Palimpzest).
 # The non-prefixed key will be used throughout for consistency as it is more universal.

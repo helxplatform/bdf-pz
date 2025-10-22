@@ -33,16 +33,11 @@ class BdfPzContext(BeakerContext):
         configure the environment appropriately.
         """
         OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+        OPENAI_API_BASE = os.environ.get("OPENAI_API_BASE", os.environ.get("OPENAI_BASE_URL"))
         GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
         # For now, these are duplicated due to the use of the `HOSTED` prefix in LiteLLM.
         VLLM_API_BASE = os.environ.get("HOSTED_VLLM_API_BASE", os.environ.get("VLLM_API_BASE"))
         VLLM_API_KEY = os.environ.get("HOSTED_VLLM_API_KEY", os.environ.get("VLLM_API_KEY"))
-
-        # Azure-OpenAI FastAPI proxy. Currently, direct usage of Azure is unsupported.
-        AZURE_OPENAI_ENDPOINT = os.environ.get("AZURE_OPENAI_ENDPOINT")
-        AZURE_OPENAI_DEPLOYMENT = os.environ.get("AZURE_OPENAI_DEPLOYMENT")
-        # This is used as a bearer token for the proxy. `AZURE_OPENAI_API_KEY` is also supported in case.
-        AZURE_OPENAI_API_KEY = os.environ.get("AZURE_OPENAI_API_KEY", os.environ.get("AZURE_OPENAI_KEY"))
 
         PZ_PREFERRED_MODELS = os.environ.get("PZ_PREFERRED_MODELS")
 
@@ -52,10 +47,8 @@ class BdfPzContext(BeakerContext):
             [
                 self.get_code("setup", { k: v for k, v in {
                     "OPENAI_API_KEY": OPENAI_API_KEY,
+                    "OPENAI_API_BASE": OPENAI_API_BASE,
                     "GEMINI_API_KEY": GEMINI_API_KEY,
-                    "AZURE_OPENAI_ENDPOINT": AZURE_OPENAI_ENDPOINT,
-                    "AZURE_OPENAI_DEPLOYMENT": AZURE_OPENAI_DEPLOYMENT,
-                    "AZURE_OPENAI_API_KEY": AZURE_OPENAI_API_KEY,
                     "VLLM_API_BASE": VLLM_API_BASE,
                     "VLLM_API_KEY": VLLM_API_KEY,
                     "PZ_PREFERRED_MODELS": PZ_PREFERRED_MODELS,

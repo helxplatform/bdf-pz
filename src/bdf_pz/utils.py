@@ -9,7 +9,6 @@ from palimpzest import constants
 from typing import Optional, TypedDict
 from openai import OpenAI
 from aenum import extend_enum
-from .azure_openai_model import LiteLLMAzureOpenAIProxy 
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +23,7 @@ class ModelCapabilitiesSpec(TypedDict):
     text: bool
     vision: bool
     audio: bool
+    embedding: bool
 
 class ModelSpec(TypedDict):
     id: str
@@ -32,7 +32,8 @@ class ModelSpec(TypedDict):
     capabilities: ModelCapabilitiesSpec
 
 
-with open(os.path.join(os.path.dirname(__file__), "custom_models.yaml"), "r") as f:
+CUSTOM_MODEL_SPECS_PATH = os.path.join(os.path.dirname(__file__), "custom_models.yaml")
+with open(CUSTOM_MODEL_SPECS_PATH, "r") as f:
     CUSTOM_MODEL_SPECS: list[ModelSpec] = yaml.safe_load(f).values()
 
 def get_model_spec_by_id(id: str) -> ModelSpec | None:
@@ -42,7 +43,7 @@ def get_model_spec_by_id(id: str) -> ModelSpec | None:
     return None
 
 VLLM_PZ_MODELS = []
-AZURE_OPENAI_PZ_MODELS = []
+OPENAI_PZ_MODELS = []
     
 def monkeypatch_palimpzest() -> None:
     # If `__bdf_patched__` exists on the module's `get_models` function,
@@ -110,12 +111,12 @@ def monkeypatch_palimpzest() -> None:
             api_base=api_base
         )
 
-        """ Azure OpenAI proxy won't be detected since it only checks for OPENAI_API_KEY. """
-        if os.getenv("AZURE_OPENAI_API_KEY", os.getenv("AZURE_OPENAI_KEY")) is not None:
-            models.extend([
-                m for m in AZURE_OPENAI_PZ_MODELS
-                if include_embedding or not m.is_embedding_model()
-            ])
+        """ Palimpzest assumes that if OPENAI_API_KEY is set, it is going to have every OpenAI model available to it.
+        This is a naive assumption--if, e.g., we are running through an azure proxy, only a subset will be usable.
+        """
+        unavailable_openai_models = [model for model in models if model.is_openai_model() and model not in OPENAI_PZ_MODELS]
+        models = [model for model in models if model not in unavailable_openai_models]
+            
 
         # Strangely, Palimpzest assumes that precanned models like `hosted_vllm/qwen/Qwen1.5-0.5B-Chat` will be available
         # on the user's configured vLLM instance.
@@ -145,7 +146,7 @@ def monkeypatch_palimpzest() -> None:
 
     setattr(palimpzest, "__bdf_patched__", True)
 
-def register_model_pz(model_spec: ModelSpec) -> constants.Model:
+def register_model(model_spec: ModelSpec) -> constants.Model:
     # Register model in Model enum
     model_name = model_spec["name"]
     model_id = model_spec["id"]
@@ -153,6 +154,26 @@ def register_model_pz(model_spec: ModelSpec) -> constants.Model:
     enum = constants.Model[model_name]
     # Register model card
     constants.MODEL_CARDS[enum] = model_spec["card"]
+    # Register model in litellm if no spec exists.
+    litellm_model, litellm_provider, _, _ = litellm.get_llm_provider(model_id)
+    try:
+        litellm.get_model_info(litellm_model, litellm_provider) # throws if not registered
+    except:
+        # Need to register model or LiteLLM will complain.
+        # This could probably be done better, but the custom models spec would need reworking.
+        litellm_key_map = {
+            "reasoning": "supports_reasoning",
+            "vision": "supports_vision",
+            "audio": "supports_audio_input"
+        }
+        litellm.register_model({
+            model_id: {
+                "litellm_provider": litellm_provider,
+                "mode": "embedding" if model_spec["capabilities"]["embedding"] else "chat",
+                **model_spec["card"],
+                **{ litellm_key_map.get(k): v for k, v in model_spec["capabilities"].items() if litellm_key_map.get(k) }
+            }
+        })
 
     return enum
 
@@ -161,8 +182,6 @@ def setup_vllm_palimpzest() -> list[constants.Model]:
     try:
         vllm_api_key = os.environ.get("HOSTED_VLLM_API_KEY", os.environ.get("VLLM_API_KEY"))
         vllm_base_url = os.environ.get("HOSTED_VLLM_API_BASE") or os.environ["VLLM_API_BASE"]
-        if not vllm_base_url.endswith("/"):
-            vllm_base_url += "/"
     except KeyError:
         logger.info("No vLLM URL has been configured. vLLM models will be unavailable.")
         return []
@@ -182,7 +201,7 @@ def setup_vllm_palimpzest() -> list[constants.Model]:
         model_spec = get_model_spec_by_id(model_id)
         if model_spec:
             # Assume it's a text model. This is pretty bad but not much to be done in current state.
-            pz_models.append(register_model_pz(model_spec))
+            pz_models.append(register_model(model_spec))
         else:
             logger.warning(
                 f"No model spec exists for the model ID '{ model_id }'. "
@@ -191,50 +210,69 @@ def setup_vllm_palimpzest() -> list[constants.Model]:
 
     return pz_models
 
-""" Hard overwrite OpenAI models in Palimpzest with Azure proxy. """
-def setup_azure_openai_palimpzest() -> list[constants.Model]:
+"""
+This is important for loading only the models available from the OpenAI server into Palimpzest.
+Otherwise, Palimpzest will assume that every OpenAI model is available when the server may actually
+be a proxy with only a subset of models offered.
+"""
+def setup_openai_palimpzest() -> list[constants.Model]:
+    pz_models = []
     try:
-        azure_openai_endpoint = os.environ["AZURE_OPENAI_ENDPOINT"]
-        azure_openai_deployment = os.environ["AZURE_OPENAI_DEPLOYMENT"]
-        azure_openai_key = os.environ.get("AZURE_OPENAI_KEY") or os.environ["AZURE_OPENAI_API_KEY"]
+        openai_api_key = os.environ["OPENAI_API_KEY"]
+        openai_base_url = os.environ.get("OPENAI_API_BASE", os.environ.get("OPENAI_BASE_URL"))
     except KeyError:
-        logger.info("Azure OpenAI proxy has not been configured. Models will be unavailable.")
+        logger.info("No OpenAI API key has been configured. OpenAI models will be unavailable.")
         return []
         
-    # Currently there's no way to detect what models are available on the Azure OpenAI proxy
-    # besides the deployment, which is guaranteed to exist.
-    model_id = "azure-openai-proxy/" + azure_openai_deployment
-    model_spec = get_model_spec_by_id(model_id)
-    if model_spec is None:
-        logger.warning(
-            f"No model spec exists for the model ID '{ model_id }'. "
-            "Please ensure you've added it to the custom_models spec."
-        )
-        return []
+    logger.debug("Attempting to fetch available OpenAI models")
+    # Get available models
+    client = OpenAI(api_key=openai_api_key, base_url=openai_base_url)
+    try:
+        models = [model.to_dict() for model in client.models.list().data]
+    except Exception as e:
+        logger.error(f"Failed to retrieve models from OpenAI using { client.base_url }models. Please ensure that the OpenAI server is running and accessible.")
+        raise e
+    
+    # Register models in palimpzest.
+    for model in models:
+        model_id = "openai/" + model["id"]
+        # The model must either have an exact match against an existing Palimpzest model or it must
+        # be registered in CUSTOM_MODEL_SPECS, as we cannot otherwise infer its capabilities.
+        pz_model = next((model for model in constants.Model if model.value == model_id), None)
 
-    pz_model = register_model_pz(model_spec)
+        if pz_model is None:
+            # Look for a custom model spec associated with the model id.
+            model_spec = get_model_spec_by_id(model_id)
+            if model_spec is None:
+                logger.warning(
+                    f"No existing Palimpzest model was found with ID '{ model_id }' "
+                    "and no custom model spec has been configured for it. "
+                    f"To enable the model, ensure you've registered its ID in '{ CUSTOM_MODEL_SPECS_PATH }'."
+                )
+                continue
+            pz_model = register_model(model_spec)
 
-    # Register handler with LiteLLM
-    azure_openai_proxy_handler = LiteLLMAzureOpenAIProxy()
-    litellm.custom_provider_map.append({
-        "provider": "azure-openai-proxy",
-        "custom_handler": azure_openai_proxy_handler
-    })
-
-    # `litellm.completion` completely ignores custom LLM providers whenever
-    # the model name corresponds to an OpenAI model... (https://github.com/BerriAI/litellm/issues/14755)
-    # So until they fix this, the easiest internal fix is to disable OpenAI entirely in LiteLLM.
-    # The consequence of this is that when the azure proxy is enabled, native OpenAI support is disabled.
-    litellm.open_ai_chat_completion_models = []
-
-    # Until we have an actual OpenAI-compliant proxy, drop unsupported OpenAI params.
-    # The current Azure OpenAI proxy we have running supports no params.
-    litellm.drop_params = True
-
-    return [pz_model]
+        pz_models.append(pz_model)
+        
+    return pz_models
 
 def setup_palimpzest() -> None:
     VLLM_PZ_MODELS.extend(setup_vllm_palimpzest())
-    AZURE_OPENAI_PZ_MODELS.extend(setup_azure_openai_palimpzest())
+    OPENAI_PZ_MODELS.extend(setup_openai_palimpzest())
+
+    # gpt-oss doesn't support reasoning_effort: "minimal" which will be used by default if unspecified
+    # and cause the request to fail. There doesn't seem to be any better way to tell litellm to not do this.
+    # Can't be dropped through litellm_params / additional_drop_params.
+    def fix_reasoning_effort(kwargs):
+        if "gpt-oss" in kwargs.get("model"):
+            complete_input_dict = kwargs.get("additional_args", {}).get("complete_input_dict", {})
+            optional_params = kwargs.get("optional_params", {})
+            if kwargs.get("reasoning_effort") == "minimal":
+                kwargs["reasoning_effort"] = "low"
+            if complete_input_dict.get("reasoning_effort") == "minimal":
+                complete_input_dict["reasoning_effort"] = "low"
+            if optional_params.get("reasoning_effort") == "minimal":
+                optional_params["reasoning_effort"] = "low"
+    litellm.input_callback = [fix_reasoning_effort]
     
     monkeypatch_palimpzest()

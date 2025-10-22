@@ -18,7 +18,7 @@ elif policy_method == "max_quality":
 preferred_models_str = os.environ.get("PZ_PREFERRED_MODELS", "").strip()
 available_models = None
 if preferred_models_str:
-    preferred_models = [model_id.split() for model_id in preferred_models_str.split(",")]
+    preferred_models = [model_id for model_id in preferred_models_str.split(",")]
     validated_models = []
     for model_id in preferred_models:
         try:
@@ -43,8 +43,11 @@ config = pz.QueryProcessorConfig(
     verbose=False,
     progress=False,
     allow_code_synth={{ allow_code_synth }},
-    # RAG currently only works when OpenAI has been configured.
-    allow_rag_reduction=os.environ.get("OPENAI_API_KEY", "") != "",
+    # RAG is currently hardcoded to use Model.TEXT_EMBEDDING_3_SMALL, so this must be disabled if the model is unavailable.
+    # (See: https://github.com/mitdbg/palimpzest/blob/1.0.0/src/palimpzest/query/operators/rag.py#L26)
+    allow_rag_reduction=pz.constants.Model.TEXT_EMBEDDING_3_SMALL in pz.utils.model_helpers.get_models(include_embedding=True)
+    # Once fixed in Palimpzest, should change to this. 
+    # allow_rag_reduction=any(m.is_embedding_model() for m in pz.utils.model_helpers.get_models(include_embedding=True))
     # Mixture of Agents disabled for now. More costly and takes far longer to execute.
     allow_mixtures=False,
     available_models=available_models

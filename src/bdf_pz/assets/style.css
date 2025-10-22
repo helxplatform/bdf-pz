@@ -16,3 +16,9 @@ body {
 .chat-container .cell-container {
     display: flex;
 }
+
+/* Beaker does not use a proper margin between icon and text under non-Thought cells. Unclear why. */
+.query-tab > span:first-child > .pi {
+    margin: auto;
+    margin-right: .5rem;
+}
