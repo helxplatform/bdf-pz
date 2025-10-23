@@ -40,6 +40,7 @@ class BdfPzContext(BeakerContext):
         VLLM_API_KEY = os.environ.get("HOSTED_VLLM_API_KEY", os.environ.get("VLLM_API_KEY"))
 
         PZ_PREFERRED_MODELS = os.environ.get("PZ_PREFERRED_MODELS")
+        PZ_RAG_ENABLED = os.environ.get("PZ_RAG_ENABLED", "false")
 
         LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
         
@@ -52,6 +53,7 @@ class BdfPzContext(BeakerContext):
                     "VLLM_API_BASE": VLLM_API_BASE,
                     "VLLM_API_KEY": VLLM_API_KEY,
                     "PZ_PREFERRED_MODELS": PZ_PREFERRED_MODELS,
+                    "PZ_RAG_ENABLED": PZ_RAG_ENABLED,
                     "LOG_LEVEL": LOG_LEVEL
                 }.items() if v is not None })
             ]

@@ -42,10 +42,13 @@ config = pz.QueryProcessorConfig(
     cache=False,
     verbose=False,
     progress=False,
-    allow_code_synth={{ allow_code_synth }},
+    allow_code_synth="{{ allow_code_synth }}".lower() == "true",
     # RAG is currently hardcoded to use Model.TEXT_EMBEDDING_3_SMALL, so this must be disabled if the model is unavailable.
     # (See: https://github.com/mitdbg/palimpzest/blob/1.0.0/src/palimpzest/query/operators/rag.py#L26)
-    allow_rag_reduction=pz.constants.Model.TEXT_EMBEDDING_3_SMALL in pz.utils.model_helpers.get_models(include_embedding=True)
+    allow_rag_reduction=(
+        pz.constants.Model.TEXT_EMBEDDING_3_SMALL in pz.utils.model_helpers.get_models(include_embedding=True) and
+        os.environ.get("PZ_RAG_ENABLED", "false").lower() == "true"
+    )
     # Once fixed in Palimpzest, should change to this. 
     # allow_rag_reduction=any(m.is_embedding_model() for m in pz.utils.model_helpers.get_models(include_embedding=True))
     # Mixture of Agents disabled for now. More costly and takes far longer to execute.

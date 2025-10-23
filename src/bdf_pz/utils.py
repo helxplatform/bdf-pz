@@ -161,7 +161,12 @@ def register_model(model_spec: ModelSpec) -> constants.Model:
     except:
         # Need to register model or LiteLLM will complain.
         # This could probably be done better, but the custom models spec would need reworking.
-        litellm_key_map = {
+        litellm_cost_map = {
+            "usd_per_input_token": "input_cost_per_token",
+            "usd_per_output_token": "output_cost_per_token",
+            "max_input_tokens": "max_input_tokens"
+        }
+        litellm_capability_map = {
             "reasoning": "supports_reasoning",
             "vision": "supports_vision",
             "audio": "supports_audio_input"
@@ -170,8 +175,8 @@ def register_model(model_spec: ModelSpec) -> constants.Model:
             model_id: {
                 "litellm_provider": litellm_provider,
                 "mode": "embedding" if model_spec["capabilities"]["embedding"] else "chat",
-                **model_spec["card"],
-                **{ litellm_key_map.get(k): v for k, v in model_spec["capabilities"].items() if litellm_key_map.get(k) }
+                **{ litellm_cost_map.get(k): v for k, v in model_spec["card"].items() if litellm_cost_map.get(k) },
+                **{ litellm_capability_map.get(k): v for k, v in model_spec["capabilities"].items() if litellm_capability_map.get(k) }
             }
         })
 

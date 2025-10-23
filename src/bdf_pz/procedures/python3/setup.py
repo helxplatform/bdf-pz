@@ -22,6 +22,8 @@ if "{{ VLLM_API_KEY }}":
     os.environ["VLLM_API_KEY"] = os.environ["HOSTED_VLLM_API_KEY"] = "{{ VLLM_API_KEY }}"
 if "{{ PZ_PREFERRED_MODELS }}":
     os.environ["PZ_PREFERRED_MODELS"] = "{{ PZ_PREFERRED_MODELS }}"
+if "{{ PZ_RAG_ENABLED }}":
+    os.environ["PZ_RAG_ENABLED"] = "{{ PZ_RAG_ENABLED }}"
 if "{{ LOG_LEVEL }}":
     LOG_LEVEL = os.environ["LOG_LEVEL"] = "{{ LOG_LEVEL }}"
 
