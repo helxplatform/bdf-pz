@@ -262,8 +262,14 @@ def setup_openai_palimpzest() -> list[constants.Model]:
     return pz_models
 
 def setup_palimpzest() -> None:
-    VLLM_PZ_MODELS.extend(setup_vllm_palimpzest())
-    OPENAI_PZ_MODELS.extend(setup_openai_palimpzest())
+    try:
+        VLLM_PZ_MODELS.extend(setup_vllm_palimpzest())
+    except Exception as e:
+        logger.error(f"Failed to load vLLM models for Palimpzest.", exc_info=e)
+    try:
+        OPENAI_PZ_MODELS.extend(setup_openai_palimpzest())
+    except Exception as e:
+        logger.error(f"Failed to load OpenAI models for Palimpzest.", exc_info=e)
 
     # gpt-oss doesn't support reasoning_effort: "minimal" which will be used by default if unspecified
     # and cause the request to fail. There doesn't seem to be any better way to tell litellm to not do this.
