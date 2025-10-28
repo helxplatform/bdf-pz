@@ -1,3 +1,5 @@
 custom-ui/dist/
 custom-ui/node_modules/
 .env
+.venv
+venv
