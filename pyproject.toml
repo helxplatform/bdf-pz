@@ -28,10 +28,13 @@ classifiers = [
   "Programming Language :: Python :: Implementation :: PyPy",
 ]
 dependencies = [
+  "archytas@git+https://github.com/helxplatform/archytas.git@fix-catch-failure",
+  "beaker_kernel@git+https://github.com/helxplatform/beaker-kernel.git@fix-fail-task",
+  "palimpzest@git+https://github.com/helxplatform/palimpzest.git@vllm-completion-bug",
   "cloudpickle==3.1.1",
-  "beaker_kernel==1.12.0",
   "pandas==2.3.3",
   "prettytable==3.16.0",
+  "langchain==0.3.27",
   "requests==2.32.5",
   "aenum==3.1.16",
   "openai==2.0.1",
@@ -39,8 +42,7 @@ dependencies = [
   # Unclear why, but beaker-kernel requires tree-sitter<0.25.0 whereas it has no constraints on tree-sitter-python.
   # This can lead to version incompatibility between tree sitter and the installed python grammar.
   "tree-sitter==0.24.0",
-  "tree-sitter-python==0.23.6",
-  "palimpzest@git+https://github.com/helxplatform/palimpzest.git@vllm-completion-bug"
+  "tree-sitter-python==0.23.6"
 ]
 
 [project.urls]

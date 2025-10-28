@@ -1,9 +1,15 @@
-FROM python:3.13
+FROM python:3.12
 
 USER root
 
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+
+RUN echo "deb http://deb.debian.org/debian bullseye main" > /etc/apt/sources.list.d/bullseye.list
+
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get upgrade -y && \
+    DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y -t bullseye libnss-ldap/bullseye && \
     DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y \
         lsof \
         libpq-dev \
@@ -47,27 +53,66 @@ RUN apt-get update && \
     locale-gen
 
 RUN pip install --upgrade --no-cache-dir hatch pip
-RUN pip install beaker-kernel==1.12.0
-RUN pip install cython
-COPY . /jupyter/
-RUN pip install /jupyter
+RUN pip install --no-cache-dir cython
 
-RUN pip install \
+# Lock palimpzest dependencies to specific versions. This greatly reduces the build latency introduced by pip's dependency
+# resolution. Ideally, this should be abstracted into something like Poetry eventually to avoid hard-coded dependencies.
+RUN pip install -v --no-cache-dir --no-deps "git+https://github.com/helxplatform/palimpzest.git@vllm-completion-bug"
+RUN pip install -v --no-cache-dir \
+    "chromadb==1.2.1" \
+    "colorama==0.4.6" \
+    "fastapi==0.120.0" \
+    "langchain==0.3.27" \
+    "litellm==1.78.7" \
+    "numpy==2.0.2" \
+    "openai==2.6.0" \
+    "pandas==2.3.3" \
+    "pillow==11.3.0" \
+    "prettytable==3.16.0" \
+    "psutil==7.1.1" \
+    "PyLD==2.0.4" \
+    "pypdf==6.1.3" \
+    "pyyaml==6.0.3" \
+    "requests==2.32.5" \
+    "sentence-transformers==5.0.0" \
+    "smolagents[toolkit]==1.22.0" \
+    "tqdm==4.67.1" \
+    "rich[jupyter]==14.2.0" \
     "psycopg2" \
     "pydot==4.0.1" \
     "graphviz==0.21" \
     "pygraphviz==1.14" \
-    "pandas>=2.1.2,<3.0.0" \
-    "scipy>=1.11.3,<2.0.0" \
-    "numpy==1.26.4"
+    "scipy==1.16.2" \
+    "seaborn==0.13.2"
+
+COPY root /
+
+COPY . /jupyter/
+# Install project dependencies prior to installing the project. Beaker-kernel's hatch builder
+# will attempt to import project files, and this will throw if every dependency is not preinstalled.
+RUN python /extract-deps.py /jupyter/pyproject.toml \
+    # Ignore palimpzest, which we lock the dependencies of in a previous step.
+    | grep -viE '^(palimpzest)' > requirements.txt && \
+    pip install -v --no-cache-dir -r requirements.txt && \
+    # Beaker-kernel requires `zmq` as a dependency but does not specify it in its `project.dependencies` list.
+    pip install -v --no-cache-dir zmq && \
+    rm requirements.txt
+RUN pip install -v --no-cache-dir --no-build-isolation "beaker-kernel@git+https://github.com/helxplatform/beaker-kernel.git@fix-fail-task"
+# All project dependencies are already installed by extract-deps, no need to reinstall the exact same list.
+RUN pip install -v --no-cache-dir --no-build-isolation --no-deps /jupyter
 
 RUN mkdir -m 777 /var/run/beaker
 
 # Set default server env variables
+ENV NB_UID=1000
+ENV NB_GID=0
 ENV BEAKER_RUN_PATH=/var/run/beaker
 ENV BEAKER_APP=bdf_pz.app.PalimpzestApp
 
-COPY root /
+RUN /fix-permissions.sh "/home"
+RUN /fix-permissions.sh "/usr/local/share/beaker"
+# Need to fix beaker's site-package permissions so that its UI bundle can be patched at runtime by fix-ui-bundle.sh
+RUN /fix-permissions.sh $(python -c "import beaker_kernel; import os; print(os.path.dirname(beaker_kernel.__file__))")
 
 USER helx
 
