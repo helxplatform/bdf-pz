@@ -48,7 +48,7 @@ config = pz.QueryProcessorConfig(
     allow_rag_reduction=(
         pz.constants.Model.TEXT_EMBEDDING_3_SMALL in pz.utils.model_helpers.get_models(include_embedding=True) and
         os.environ.get("PZ_RAG_ENABLED", "false").lower() == "true"
-    )
+    ),
     # Once fixed in Palimpzest, should change to this. 
     # allow_rag_reduction=any(m.is_embedding_model() for m in pz.utils.model_helpers.get_models(include_embedding=True))
     # Mixture of Agents disabled for now. More costly and takes far longer to execute.

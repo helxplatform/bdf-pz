@@ -4,9 +4,12 @@
 from typing import Dict, Any, TYPE_CHECKING
 import os
 import logging
+import requests
 
 from beaker_kernel.lib import BeakerContext
+from beaker_kernel.lib.autodiscovery import autodiscover
 from beaker_kernel.lib.utils import action
+from beaker_kernel.lib.config import config as beaker_config
 
 from .agent import BdfPzAgent, BasicAgent
 
@@ -15,7 +18,45 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-class BdfPzContext(BeakerContext):
+class BaseContext(BeakerContext):
+    """ Fix bug in URL construction in parent method... """
+    def get_subkernel(self):
+        config = beaker_config
+        language = self.config.get("language", "python3")
+        self.beaker_kernel.debug("new_kernel", f"Setting new kernel of `{language}`")
+        kernel_opts = {
+            subkernel.KERNEL_NAME: subkernel
+            for subkernel in autodiscover("subkernels").values()
+        }
+        subkernel_opts = {
+            subkernel.SLUG: subkernel
+            for subkernel in autodiscover("subkernels").values()
+        }
+        if language not in kernel_opts and language in subkernel_opts:
+            language = subkernel_opts[language].KERNEL_NAME
+
+        url = f"{self.beaker_kernel.jupyter_server.rstrip('/')}/api/kernels"
+        res = requests.post(
+            url,
+            json={"name": language, "path": ""},
+            headers={"Authorization": f"token {config.jupyter_token}"},
+        )
+        kernel_info = res.json()
+        self.beaker_kernel.update_running_kernels()
+        kernels = self.beaker_kernel.kernels
+        subkernel_id = kernel_info["id"]
+        # NOTE: MODIFIED `connect_to`
+        # TODO: Refactor this into `lib/kernel_proxy_manager.py`
+        matching = next((n for n in kernels if subkernel_id in n), None)
+        if matching is None:
+            raise ValueError("Unknown kernel " + subkernel_id)
+        if kernels[matching] == self.beaker_kernel.server.config:
+            raise ValueError("Refusing loopback connection")
+        subkernel = kernel_opts[language](subkernel_id, kernels[matching], self)
+        self.beaker_kernel.server.set_proxy_target(subkernel.connected_kernel)
+        return subkernel
+
+class BdfPzContext(BaseContext):
     """
     Biomedical Data Fabric Palimpzest Context Class
     """
@@ -96,7 +137,7 @@ class BdfPzContext(BeakerContext):
             """.strip()
 
 
-class BasicContext(BeakerContext):
+class BasicContext(BaseContext):
     """
     Basic context for generalized usage of an agent
     """

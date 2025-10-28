@@ -1,19 +1,22 @@
 # SPDX-FileCopyrightText: 2024-present Brandon Rose <rose.brandon.m@gmail.com>
 #
 # SPDX-License-Identifier: MIT
+import traceback
+import re
+import json
 from typing import TYPE_CHECKING, Dict, List, Tuple, Type
-
-import pandas as pd
 from archytas.tool_utils import AgentRef, LoopControllerRef, ReactContextRef, tool
+from archytas.exceptions import ExecutionError
 from beaker_kernel.lib import BeakerAgent
 
 if TYPE_CHECKING:
     from beaker_kernel.kernel import BeakerKernel
 
-import json
 
 JSON_OUTPUT = False
 PRINT_OUTPUT = True
+
+ANSI_ESCAPE = re.compile(r'\x1b\[.*?m')
 
 
 class BdfPzAgent(BeakerAgent):
@@ -22,6 +25,20 @@ class BdfPzAgent(BeakerAgent):
     declarative system for optimizing AI workloads.
 
     """
+
+    # NOTE: Unless @tool reraises when result["error"] is defined, the agent will be in
+    # the dark as to if something went wrong in the tool execution.
+    def handle_response(self, result: dict, loop: LoopControllerRef) -> None:
+        error = result.get("error")
+        if error:
+            # We aren't using this currently since beaker doesn't handle fail_task properly. If the
+            # agent elects to abort and return fail_task, UI fails to display what went wrong.
+            # loop.set_state(loop.STOP_FATAL)
+            
+
+            error_traceback = "\n".join([ANSI_ESCAPE.sub("", line) for line in error["traceback"]])
+            # raise ExecutionError(error_traceback)
+            return error_traceback
 
     async def auto_context(self):
         return """You are an assistant that is intended to assist users in using Palimpzest.
@@ -35,7 +52,7 @@ class BdfPzAgent(BeakerAgent):
         """
 
     @tool()
-    async def register_dataset(self, path: str, name: str, agent: AgentRef) -> str:
+    async def register_dataset(self, path: str, name: str, agent: AgentRef, loop: LoopControllerRef) -> str:
         """
         This function registers a dataset with Palimpzest. It takes a path to a file or directory
         and a name for the dataset. The dataset will be registered and made available for use in
@@ -51,6 +68,7 @@ class BdfPzAgent(BeakerAgent):
 
         code = agent.context.get_code("register_dataset", {"path": path, "name": name})
         response = await agent.context.evaluate(code)
+        self.handle_error(response, loop)
         return response["return"]
 
     @tool()
@@ -153,6 +171,7 @@ class BdfPzAgent(BeakerAgent):
         field_descriptions: list,
         field_types: list,
         agent: AgentRef,
+        loop: LoopControllerRef
     ) -> str:
         """
         This function takes in a set of fields to be used to generate an extraction schema.
@@ -259,7 +278,7 @@ class BdfPzAgent(BeakerAgent):
         loop: LoopControllerRef,
     ) -> str:
         """
-        This function converts an input dataset to a new output dataset with a different schema.
+        This function associates a dataset with a specific schema.
         The function has to be used to extract any information from a collection of input documents.
         The function is typically needed before executing a workload, to apply a generated schema to an existing dataset.
         If there is not an applicable schema, an appropriate schema should be generated using the create_schema tool.
@@ -306,51 +325,51 @@ class BdfPzAgent(BeakerAgent):
 
             return output
 
-    @tool
-    async def override_dataset(
-        self, agent: AgentRef, dataset_name: str, loop: LoopControllerRef
-    ) -> str:
-        """
-        The function is required after a workload has been executed, if the user needs to run a new workload with new converts or filters.
-        The effect of this function is to reset the working dataset to the input dataset.
-        This function deletes an existing dataset and sets the working dataset to a new input dataset.
+    # @tool
+    # async def override_dataset(
+    #     self, agent: AgentRef, dataset_name: str, loop: LoopControllerRef
+    # ) -> str:
+    #     """
+    #     The function is required after a workload has been executed, if the user needs to run a new workload with new converts or filters.
+    #     The effect of this function is to reset the working dataset to the input dataset.
+    #     This function deletes an existing dataset and sets the working dataset to a new input dataset.
 
-        Args:
-            dataset_name (str): An existing object of type dataset to use for conversion.
+    #     Args:
+    #         dataset_name (str): An existing object of type dataset to use for conversion.
 
-        Returns:
-            str: returns a new dataset corresponding to the converted input dataset.
+    #     Returns:
+    #         str: returns a new dataset corresponding to the converted input dataset.
 
-        """
+    #     """
 
-        # Note: this tool could likely be removed completely?
-        # Maybe it is relevant to the generation of model context.
-        code = agent.context.get_code(
-            "set_input_dataset",
-            {
-                "dataset_name": dataset_name,
-            },
-        )
+    #     # Note: this tool could likely be removed completely?
+    #     # Maybe it is relevant to the generation of model context.
+    #     code = agent.context.get_code(
+    #         "set_input_dataset",
+    #         {
+    #             "dataset_name": dataset_name,
+    #         },
+    #     )
 
-        if PRINT_OUTPUT:
-            print(code)
-        if JSON_OUTPUT:
-            return json.dumps(
-                {
-                    "action": "code_cell",
-                    "language": "python3",
-                    "content": code.strip(),
-                }
-            )
-        else:
-            result = await agent.context.evaluate(
-                code,
-                parent_header={},
-            )
+    #     if PRINT_OUTPUT:
+    #         print(code)
+    #     if JSON_OUTPUT:
+    #         return json.dumps(
+    #             {
+    #                 "action": "code_cell",
+    #                 "language": "python3",
+    #                 "content": code.strip(),
+    #             }
+    #         )
+    #     else:
+    #         result = await agent.context.evaluate(
+    #             code,
+    #             parent_header={},
+    #         )
 
-            output = result.get("return")
+    #         output = result.get("return")
 
-            return output
+    #         return output
 
     @tool()
     async def set_input_dataset(
@@ -396,40 +415,40 @@ class BdfPzAgent(BeakerAgent):
                 loop.set_state(loop.STOP_FAILURE)
             return output
 
-    @tool()
-    async def pick_schema(self, schema_name: str, agent: AgentRef) -> str:  # noqa: F821
-        """
-        This function picks a given schema class given its name.
-        If the schema is not found, the function returns None. Provide a message to the user in this case, and proceed with creating a new schema with the given name.
-        Args:
-            schema_name (str): The name of the schema class to fetch.
-        Returns:
-            str: returns the schema class object that corresponds to the given schema name.
-        """
+    # @tool()
+    # async def pick_schema(self, schema_name: str, agent: AgentRef) -> str:  # noqa: F821
+    #     """
+    #     This function picks a given schema class given its name.
+    #     If the schema is not found, the function returns None. Provide a message to the user in this case, and proceed with creating a new schema with the given name.
+    #     Args:
+    #         schema_name (str): The name of the schema class to fetch.
+    #     Returns:
+    #         str: returns the schema class object that corresponds to the given schema name.
+    #     """
 
-        code = agent.context.get_code(
-            "pick_schema",
-            {"schema_name": schema_name},
-        )
+    #     code = agent.context.get_code(
+    #         "pick_schema",
+    #         {"schema_name": schema_name},
+    #     )
 
-        if PRINT_OUTPUT:
-            print(code)
-        if JSON_OUTPUT:
-            return json.dumps(
-                {
-                    "action": "code_cell",
-                    "language": "python3",
-                    "content": code.strip(),
-                }
-            )
-        else:
-            result = await agent.context.evaluate(
-                code,
-                parent_header={},
-            )
-            output = result.get("return")
+    #     if PRINT_OUTPUT:
+    #         print(code)
+    #     if JSON_OUTPUT:
+    #         return json.dumps(
+    #             {
+    #                 "action": "code_cell",
+    #                 "language": "python3",
+    #                 "content": code.strip(),
+    #             }
+    #         )
+    #     else:
+    #         result = await agent.context.evaluate(
+    #             code,
+    #             parent_header={},
+    #         )
+    #         output = result.get("return")
 
-            return output
+    #         return output
 
     @tool()
     async def list_schemas(self, agent: AgentRef) -> str:
