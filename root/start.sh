@@ -17,6 +17,11 @@ else
   export HOME="/root"
 fi
 
+export NB_ROOT_DIR=${NB_ROOT_DIR-$HOME}
+export JUPYTER_BASE_URL=$NB_PREFIX
+export JUPYTER_WS_URL="wss://$HOST$NB_PREFIX/"
+export JUPYTER_SERVER=$NB_PREFIX
+
 # Change to the root directory to mitigate problems if the current working
 # directory is deleted.
 cd /
@@ -34,14 +39,18 @@ done
 # Change CWD to /home/$USER so it is the starting point for shells.
 cd $HOME
 
+
 # Where user-specific non-essential (cached) data should be written (analogous to /var/cache).
 # Should default to $HOME/.cache.
 # https://wiki.archlinux.org/title/XDG_Base_Directory
 export XDG_CACHE_HOME=$HOME/.cache
 
-python -m beaker_kernel.service.server \
+# Fix static URLs in beaker asset bundle.
+/fix-ui-bundle.sh
+
+python -m bdf_pz.server \
     --IdentityProvider.token='' \
-    --ServerApp.ip='*' \
+    --ServerApp.ip='0.0.0.0' \
     --ServerApp.base_url=${NB_PREFIX} \
     --ServerApp.allow_origin="*" \
     --ServerApp.root_dir=${NB_ROOT_DIR} \

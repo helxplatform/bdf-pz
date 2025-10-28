@@ -92,11 +92,14 @@ else
   fi
 fi
 
-if [[ "$USER" != "$DEFAULT_USER" ]]; then
-  if [[ $DELETE_DEFAULT_USER_HOME_IF_UNUSED == "yes" ]]; then
-    if [ -d /home/$DEFAULT_USER ]; then
-      echo "deleting /home/$DEFAULT_USER"
-      rm -rf /home/$DEFAULT_USER
+if [[ ${USER_IDENTITY:-} != "ldap" ]]; then
+  echo "USER_IDENTITY is either unset or not 'ldap'"
+  if [[ "$USER" != "$DEFAULT_USER" ]]; then
+    if [[ $DELETE_DEFAULT_USER_HOME_IF_UNUSED == "yes" ]]; then
+      if [ -d /home/$DEFAULT_USER ]; then
+        echo "deleting /home/$DEFAULT_USER"
+        rm -rf /home/$DEFAULT_USER || echo "Warning: failed to delete /home/$DEFAULT_USER"
+      fi
     fi
   fi
 fi
