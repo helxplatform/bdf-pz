@@ -19,6 +19,9 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 class BaseContext(BeakerContext):
+    # Hide this class from beaker's hatch hook.
+    slug = None
+    
     """ Fix bug in URL construction in parent method... """
     def get_subkernel(self):
         config = beaker_config
