@@ -278,7 +278,7 @@ class BdfPzAgent(BeakerAgent):
         loop: LoopControllerRef,
     ) -> str:
         """
-        This function associates a dataset with a specific schema.
+        This function creates an output dataset by augmenting an input dataset with a specific schema.
         The function has to be used to extract any information from a collection of input documents.
         The function is typically needed before executing a workload, to apply a generated schema to an existing dataset.
         If there is not an applicable schema, an appropriate schema should be generated using the create_schema tool.

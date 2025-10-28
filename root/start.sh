@@ -18,7 +18,7 @@ else
 fi
 
 export NB_ROOT_DIR=${NB_ROOT_DIR-$HOME}
-export JUPYTER_BASE_URL=$NB_PREFIX
+export JUPYTER_BASE_URL="https://$HOST$NB_PREFIX/"
 export JUPYTER_WS_URL="wss://$HOST$NB_PREFIX/"
 export JUPYTER_SERVER=$NB_PREFIX
 
@@ -44,6 +44,9 @@ cd $HOME
 # Should default to $HOME/.cache.
 # https://wiki.archlinux.org/title/XDG_Base_Directory
 export XDG_CACHE_HOME=$HOME/.cache
+
+# Create a dataset symlink
+ln -sfn /jupyter/testdata "$HOME/testdata"
 
 # Fix static URLs in beaker asset bundle.
 /fix-ui-bundle.sh
