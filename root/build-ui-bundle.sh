@@ -10,3 +10,7 @@ BEAKER_LOCATION="${BEAKER_LOCATION}/../"
 
 cd $BEAKER_LOCATION
 make beaker_kernel/service/ui/index.html
+
+# Delete node_modules; very large and no longer needed once bundle is generated.
+rm -rf beaker-vue/node_modules
+rm -rf beaker-ts/node_modules
