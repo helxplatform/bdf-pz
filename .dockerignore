@@ -3,3 +3,4 @@ custom-ui/node_modules/
 .env
 .venv
 venv
+maildir

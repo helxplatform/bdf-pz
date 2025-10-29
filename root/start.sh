@@ -48,7 +48,8 @@ export XDG_CACHE_HOME=$HOME/.cache
 # Create a dataset symlink
 ln -sfn /jupyter/testdata "$HOME/testdata"
 
-# Fix static URLs in beaker asset bundle.
+# Fix static URLs in beaker asset bundle. This needs to be performed at runtime to ensure that the correct
+# NB_PREFIX is used.
 /fix-ui-bundle.sh
 
 python -m bdf_pz.server \
