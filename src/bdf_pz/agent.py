@@ -18,8 +18,33 @@ PRINT_OUTPUT = True
 
 ANSI_ESCAPE = re.compile(r'\x1b\[.*?m')
 
+class BaseAgent(BeakerAgent):
+    """
+    Replace original tool from ReActAgent. The name and docstring of this tool often causes
+    agents to misunderstand its purpose and misuse it.
+    """
+    @tool(autosummarize=True)
+    def retrieve_summarized_messages_of_summary(
+        self,
+        summary_message_uuid: str,
+        agent_ref: AgentRef,
+    ) -> str:
+        """
+        Temporarily retrieves and rehydrates the full, raw messages previously condensed into a summary message.
+        The contents will be available during the current ReAct loop, but will be removed once the current loop is
+        finished.
 
-class BdfPzAgent(BeakerAgent):
+        Args:
+            summary_message_uuid (str): The UUIDv4 identifier of the summary message from which you want to recover the
+                    full, unsummarized messages.
+
+        Returns:
+            str: The full contents of the requested previously summarized messages.
+        """
+        return super().retrieve_summarized_messages_of_summary(summary_message_uuid, agent_ref)
+
+
+class BdfPzAgent(BaseAgent):
     """
     You are a helpful agent that is intended to assist users in using Palimpzest, a
     declarative system for optimizing AI workloads.
@@ -49,6 +74,8 @@ class BdfPzAgent(BeakerAgent):
         convert datasets, generating schemas, and executing workloads.
 
         Make sure you understand all the steps needed to complete the task. Try to run all of the steps at once.
+
+        Always use `run_code` for tasks that other tools do not enable you to accomplish. 
         """
 
     @tool()
@@ -95,10 +122,10 @@ class BdfPzAgent(BeakerAgent):
     @tool()
     async def list_datasets(self, agent: AgentRef) -> str:
         """
-        This function lists all available datasets in the system. You should use these results to nicely format the output for the user.
+        This function lists all available datasets in the system.
 
         Returns:
-            str: A table of the datasets in the system.
+            str: A table of the datasets in the system (path, name, file_count).
         """
 
         code = agent.context.get_code("list_datasets", {})
@@ -126,14 +153,13 @@ class BdfPzAgent(BeakerAgent):
     @tool()
     async def retrieve_dataset(self, dataset_name: str, agent: AgentRef) -> list[str]:
         """
-        This function lists the available items within a given dataset path. The function prints which records are available
-        for the user to use in the given dataset.
+        This function lists the available files within a given dataset.
 
         Args:
             dataset_name (str): The name of the dataset to retrieve.
 
         Returns:
-            list[str]: a list of the record identifiers (e.g., filenames, keys, etc...) available to the user in the given dataset.
+            list[str]: a list of the item identifiers (e.g., filenames, keys, etc...) available to the user in the given dataset.
         """
 
         code = agent.context.get_code(
@@ -325,6 +351,7 @@ class BdfPzAgent(BeakerAgent):
 
             return output
 
+    # Doesn't seem to accomplish anything. Will sometimes confuse the agent.
     # @tool
     # async def override_dataset(
     #     self, agent: AgentRef, dataset_name: str, loop: LoopControllerRef
@@ -415,6 +442,7 @@ class BdfPzAgent(BeakerAgent):
                 loop.set_state(loop.STOP_FAILURE)
             return output
 
+    # Doesn't seem to accomplish anything.
     # @tool()
     # async def pick_schema(self, schema_name: str, agent: AgentRef) -> str:  # noqa: F821
     #     """
@@ -580,7 +608,7 @@ class BdfPzAgent(BeakerAgent):
             output = result.get("return")
             return output
 
-class BasicAgent(BeakerAgent):
+class BasicAgent(BaseAgent):
     """
     You are a helpful assistant designed to support users in working with Jupyter notebooks.
     Your role is to assist with analyzing data, automating tasks, organizing code, and helping users

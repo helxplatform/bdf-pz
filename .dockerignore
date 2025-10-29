@@ -4,3 +4,9 @@ custom-ui/node_modules/
 .venv
 venv
 maildir
+.DS_Store
+parse_answer_errors/*
+parse-answer-errors/*
+__pycache__/
+*.py[codz]
+*$py.class
