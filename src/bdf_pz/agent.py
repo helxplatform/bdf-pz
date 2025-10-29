@@ -53,17 +53,13 @@ class BdfPzAgent(BaseAgent):
 
     # NOTE: Unless @tool reraises when result["error"] is defined, the agent will be in
     # the dark as to if something went wrong in the tool execution.
-    def handle_response(self, result: dict, loop: LoopControllerRef) -> None:
+    def handle_response(self, result: dict) -> None:
         error = result.get("error")
         if error:
-            # We aren't using this currently since beaker doesn't handle fail_task properly. If the
-            # agent elects to abort and return fail_task, UI fails to display what went wrong.
-            # loop.set_state(loop.STOP_FATAL)
-            
-
             error_traceback = "\n".join([ANSI_ESCAPE.sub("", line) for line in error["traceback"]])
-            # raise ExecutionError(error_traceback)
-            return error_traceback
+            raise ExecutionError(error_traceback)
+        
+        return result.get("return")
 
     async def auto_context(self):
         return """You are an assistant that is intended to assist users in using Palimpzest.
@@ -79,7 +75,7 @@ class BdfPzAgent(BaseAgent):
         """
 
     @tool()
-    async def register_dataset(self, path: str, name: str, agent: AgentRef, loop: LoopControllerRef) -> str:
+    async def register_dataset(self, path: str, name: str, agent: AgentRef) -> str:
         """
         This function registers a dataset with Palimpzest. It takes a path to a file or directory
         and a name for the dataset. The dataset will be registered and made available for use in
@@ -95,8 +91,7 @@ class BdfPzAgent(BaseAgent):
 
         code = agent.context.get_code("register_dataset", {"path": path, "name": name})
         response = await agent.context.evaluate(code)
-        self.handle_error(response, loop)
-        return response["return"]
+        return self.handle_response(response)
 
     @tool()
     async def unregister_dataset(self, dataset_name: str, agent: AgentRef) -> str:
@@ -117,7 +112,7 @@ class BdfPzAgent(BaseAgent):
         if PRINT_OUTPUT:
             print(code)
         response = await agent.context.evaluate(code)
-        return response["return"]
+        return self.handle_response(response)
 
     @tool()
     async def list_datasets(self, agent: AgentRef) -> str:
@@ -146,9 +141,7 @@ class BdfPzAgent(BaseAgent):
                 parent_header={},
             )
 
-            output = result.get("return")
-
-            return output
+            return self.handle_response(result)
 
     @tool()
     async def retrieve_dataset(self, dataset_name: str, agent: AgentRef) -> list[str]:
@@ -183,11 +176,7 @@ class BdfPzAgent(BaseAgent):
                 parent_header={},
             )
 
-            output = result.get("return")
-
-            return output
-
-        return ""
+            return self.handle_response(result)
 
     @tool()
     async def create_schema(
@@ -243,9 +232,7 @@ class BdfPzAgent(BaseAgent):
                 parent_header={},
             )
 
-            output = result.get("return")
-
-            return output
+            return self.handle_response(result)
 
     @tool()
     async def filter_data(
@@ -290,9 +277,7 @@ class BdfPzAgent(BaseAgent):
                 parent_header={},
             )
 
-            output = result.get("return")
-
-            return output
+            return self.handle_response(result)
 
     @tool
     async def convert_dataset(
@@ -347,9 +332,7 @@ class BdfPzAgent(BaseAgent):
                 parent_header={},
             )
 
-            output = result.get("return")
-
-            return output
+            return self.handle_response(result)
 
     # Doesn't seem to accomplish anything. Will sometimes confuse the agent.
     # @tool
@@ -437,10 +420,7 @@ class BdfPzAgent(BaseAgent):
                 code,
                 parent_header={},
             )
-            output = result.get("return")
-            if output == "":
-                loop.set_state(loop.STOP_FAILURE)
-            return output
+            return self.handle_response(result)
 
     # Doesn't seem to accomplish anything.
     # @tool()
@@ -505,9 +485,7 @@ class BdfPzAgent(BaseAgent):
                 parent_header={},
             )
 
-            output = result.get("return")
-
-            return output
+            return self.handle_response(result)
 
     @tool()
     async def execute_workload(
@@ -566,9 +544,7 @@ class BdfPzAgent(BaseAgent):
                 parent_header={},
             )
 
-            output = result.get("return")
-
-            return output
+            return self.handle_response(result)
 
     @tool()
     async def print_statistics(
@@ -605,8 +581,7 @@ class BdfPzAgent(BaseAgent):
                 code,
                 parent_header={},
             )
-            output = result.get("return")
-            return output
+            return self.handle_response(result)
 
 class BasicAgent(BaseAgent):
     """

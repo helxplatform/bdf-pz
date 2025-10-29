@@ -32,7 +32,7 @@ for file in os.listdir(dataset_path):
 
 if DatasetClass is None:
     # If the dataset file extensions are unrecognized, assume they are textual in nature.
-    logger.warning(
+    print(
         f"No compatible file types found in directory for '{dataset_name}' ({dataset_path}). "
         "Defaulting to TextFileDataset."
     )
