@@ -10,7 +10,10 @@ STATIC_FILES="$BEAKER_LOCATION/service/ui/static"
 NB_PREFIX_RELATIVE=${NB_PREFIX#/}
 
 # Replace static URLs hard-coded to root `/`
-sed -i "s|/static|$NB_PREFIX/static|g" "$UI_INDEX"
+sed -i \
+    -e "s|/static|$NB_PREFIX/static|g" \
+    -e "s|/favicon|$NB_PREFIX/favicon|g" \
+    "$UI_INDEX"
 
 # Replace config URLs and static URLs hard-coded to root.
 for FILE in $STATIC_FILES/*; do
@@ -18,10 +21,14 @@ for FILE in $STATIC_FILES/*; do
         if ! sed -i \
             -e "s|p(\"baseUrl\")|\"$NB_PREFIX\"|g" \
             -e "s|static/|$NB_PREFIX_RELATIVE/static/|g" \
+            -e "s|/themes|$NB_PREFIX/themes|g" \
             -e "s|/files|$NB_PREFIX/files|g" \
-            -e "s|/integrations|$NB_PREFIX/integrations|g" \
+            -e "s|\`/integrations|\`$NB_PREFIX/integrations|g" \
+            -e "s|\`/beaker/integrations|\`$NB_PREFIX/beaker/integrations|g" \
             -e "s|chat?.default ? \"\" : \"chat\"|chat?.default ? \"$NB_PREFIX_RELATIVE\" : \"$NB_PREFIX_RELATIVE/chat\"|g" \
             -e "s|notebook?.default ? \"\" : \"notebook\"|notebook?.default ? \"$NB_PREFIX_RELATIVE\" : \"$NB_PREFIX_RELATIVE/notebook\"|g" \
+            -e "s|href: \"/chat\"|href: \"$NB_PREFIX/chat\"|g" \
+            -e "s|href: \"/notebook\"|href: \"$NB_PREFIX/notebook\"|g" \
             -e "s|ath: \"/|ath: \"$NB_PREFIX/|g" \
             -e "s|alias = \"/|alias = \"$NB_PREFIX|g" \
             "$FILE";
