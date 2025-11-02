@@ -78,11 +78,11 @@ reference_schema = [
 ]
 
 DATA_PATH = "testdata/"
-# print("Setup complete")
 
 registered_datasets = {}
-for name in os.listdir(DATA_PATH):
-    registered_datasets[name] = os.path.join(DATA_PATH, name)
+if os.path.isdir(DATA_PATH):
+    for name in os.listdir(DATA_PATH):
+        registered_datasets[name] = os.path.join(DATA_PATH, name)
 
 existing_schemas = {"ScientificPaper":scientific_paper_schema,
                     "Reference":reference_schema}

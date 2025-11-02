@@ -22,23 +22,35 @@ extension_map = {
     '.txt':      pz.TextFileDataset,
 }
 
-DatasetClass = None
+found_dataclasses = set()
 for file in os.listdir(dataset_path):
     _, file_extension = os.path.splitext(file)
     ext = file_extension.lower()
     if ext in extension_map:
-        DatasetClass = extension_map[ext]
-        break
+        found_dataclasses.add(extension_map[ext])
 
-if DatasetClass is None:
+DatasetClass = None
+if found_dataclasses:
+    if len(found_dataclasses) > 1:
+        cls_names = [cls.__name__ for cls in found_dataclasses]
+        raise ValueError(
+            f"Mixed dataset types detected: { ', '.join(cls_names) }. "
+            "Only unimodal datasets are currently supported."
+        )
+    DatasetClass = list(found_dataclasses)[0]
+else:
     # If the dataset file extensions are unrecognized, assume they are textual in nature.
-    print(
-        f"No compatible file types found in directory for '{dataset_name}' ({dataset_path}). "
-        "Defaulting to TextFileDataset."
+    logger.warning(
+        f"Warning: No compatible file types found in directory for '{dataset_name}' ({dataset_path}). "
+        "Defaulting to TextFileDataset. This will behave erratically if files cannot be interpreted textually."
     )
     DatasetClass = pz.TextFileDataset
 
 # Instantiate the chosen dataset class
 dataset = DatasetClass(id=dataset_name, path=dataset_path)
+# Track each transformation of the dataset for the purposes of backtracking an action if necessary.
+dataset_revisions = [
+    (dataset, ("set_input_dataset", dataset_name))
+]
 
 dataset

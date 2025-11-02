@@ -4,6 +4,7 @@
 import traceback
 import re
 import json
+import logging
 from typing import TYPE_CHECKING, Dict, List, Tuple, Type
 from archytas.tool_utils import AgentRef, LoopControllerRef, ReactContextRef, tool
 from archytas.exceptions import ExecutionError
@@ -17,6 +18,18 @@ JSON_OUTPUT = False
 PRINT_OUTPUT = True
 
 ANSI_ESCAPE = re.compile(r'\x1b\[.*?m')
+PROCEDURE_LOGGER_TEMPLATE_PATTERN = (
+    r"^\s*" # Optional leading whitespace
+    r"[\d\s,:-]+?"  # Match the timestamp (e.g., "2025-11-02 16:38:00,123")
+    r"\s+-\s+" # Separator
+    r"[\w.]+" # The logger name
+    r"\s+-\s+" # Separator
+    # Capture the log level, but only if it's WARNING or higher
+    r"{level_part}"
+    r"\s+-\s+" # Separator
+    # Capture the rest of the line as the message
+    r"(?P<message>.*)$"
+)
 
 class BaseAgent(BeakerAgent):
     """
@@ -51,6 +64,26 @@ class BdfPzAgent(BaseAgent):
 
     """
 
+    def _parse_procedure_logs(
+        self,
+        stderr_list: list[str],
+        min_level=logging.WARNING,
+        parse_log_message=False
+    ) -> dict[str, list[str]]:
+        log_level_map = logging.getLevelNamesMapping()
+        captured_level_names = [level_name for (level_name, level_value) in log_level_map.items() if level_value >= min_level]
+        level_part = f"(?P<level>{'|'.join(captured_level_names)})"
+        log_pattern = re.compile(PROCEDURE_LOGGER_TEMPLATE_PATTERN.format(level_part=level_part))
+        
+        parsed_logs = { level_name : [] for level_name in log_level_map.keys() }
+        for line in stderr_list:
+            match = log_pattern.match(line.strip())
+            if match:
+                log_level = match.group("level")
+                log_message = match.group("message")
+                parsed_logs[log_level].append(log_message if parse_log_message else line)
+        return { level: level_logs for (level, level_logs) in parsed_logs.items() if len(level_logs) > 0 }
+
     # NOTE: Unless @tool reraises when result["error"] is defined, the agent will be in
     # the dark as to if something went wrong in the tool execution.
     def handle_response(self, result: dict) -> None:
@@ -59,7 +92,13 @@ class BdfPzAgent(BaseAgent):
             error_traceback = "\n".join([ANSI_ESCAPE.sub("", line) for line in error["traceback"]])
             raise ExecutionError(error_traceback)
         
-        return result.get("return")
+        out = result.get("return")
+        parsed_logs = self._parse_procedure_logs(result.get("stderr_list"), min_level=logging.WARNING, parse_log_message=True)
+        for log_level in parsed_logs:
+            level_logs = parsed_logs[log_level]
+            out += f"\n\n[TOOL {log_level} LOGS]:\n" + "\n".join(f"- { log }" for log in level_logs)
+        
+        return out
 
     async def auto_context(self):
         return """You are an assistant that is intended to assist users in using Palimpzest.
@@ -182,9 +221,9 @@ class BdfPzAgent(BaseAgent):
     async def create_schema(
         self,
         schema_name: str,
-        field_names: list,
-        field_descriptions: list,
-        field_types: list,
+        field_names: list[str],
+        field_descriptions: list[str],
+        field_types: list[str | int | float | bool],
         agent: AgentRef,
         loop: LoopControllerRef
     ) -> str:
@@ -198,9 +237,9 @@ class BdfPzAgent(BaseAgent):
 
         Args:
             schema_name (str): the name of the schema to add
-            field_names (list): a list of field names
-            field_descriptions (list): a list of field descriptions
-            field_types (list): a list of native Python types for the fields
+            field_names (list[str]): a list of field names
+            field_descriptions (list[str]): a list of field descriptions
+            field_types (list[str | int | float | bool]): a list of native Python types for the fields (also accepts elements of list[primitive])
 
         Returns:
             str: the name of the new schema that was created
@@ -293,8 +332,8 @@ class BdfPzAgent(BaseAgent):
         The function has to be used to extract any information from a collection of input documents.
         The function is typically needed before executing a workload, to apply a generated schema to an existing dataset.
         If there is not an applicable schema, an appropriate schema should be generated using the create_schema tool.
-        If multiple objects of the new schema can be extracted from a single object of the input dataset, the cardinality should be set to "one_to_many". If only one object of the new schema can be extracted from a single object of the input dataset, the cardinality should be set to "one_to_one".
-        For example if a user wants to extract the titles for a dataset of scientific papers, the schema might be a TitleSchema.
+        If the schema object can be extracted multiple times from a single object of the input dataset, the cardinality should be set to "one_to_many". If the schema can only be extracted once from a single object of the input dataset, the cardinality should be set to "one_to_one".
+        For example if a user wants to extract the titles for a dataset of scientific papers, the schema might be a TitleSchema, and the cardinality would be one_to_one.
 
 
         Args:
@@ -333,53 +372,37 @@ class BdfPzAgent(BaseAgent):
             )
 
             return self.handle_response(result)
+        
+    @tool()
+    async def backtrack_dataset_operation(
+        self, agent: AgentRef, loop: LoopControllerRef
+    ) -> str:
+        """
+        This function reverses the most recent dataset operation (convert_dataset, filter_dataset) back to the previous dataset.
+        A dataset revision is only generated for successful operations, so this should only be used if the user requests you to undo an operation, not when an operation fails/errors.
+        For example, if a user asks you to filter the dataset but then dislikes the filter you used, they may ask you to undo the filter, which can be done using this tool.
+        
+        Returns:
+            str: returns the removed dataset operation and its arguments on line 1, and the current dataset operation and its arguments on line 2.
+        """
+        code = agent.context.get_code("backtrack_dataset_operation", {})
+        if PRINT_OUTPUT:
+            print(code)
 
-    # Doesn't seem to accomplish anything. Will sometimes confuse the agent.
-    # @tool
-    # async def override_dataset(
-    #     self, agent: AgentRef, dataset_name: str, loop: LoopControllerRef
-    # ) -> str:
-    #     """
-    #     The function is required after a workload has been executed, if the user needs to run a new workload with new converts or filters.
-    #     The effect of this function is to reset the working dataset to the input dataset.
-    #     This function deletes an existing dataset and sets the working dataset to a new input dataset.
-
-    #     Args:
-    #         dataset_name (str): An existing object of type dataset to use for conversion.
-
-    #     Returns:
-    #         str: returns a new dataset corresponding to the converted input dataset.
-
-    #     """
-
-    #     # Note: this tool could likely be removed completely?
-    #     # Maybe it is relevant to the generation of model context.
-    #     code = agent.context.get_code(
-    #         "set_input_dataset",
-    #         {
-    #             "dataset_name": dataset_name,
-    #         },
-    #     )
-
-    #     if PRINT_OUTPUT:
-    #         print(code)
-    #     if JSON_OUTPUT:
-    #         return json.dumps(
-    #             {
-    #                 "action": "code_cell",
-    #                 "language": "python3",
-    #                 "content": code.strip(),
-    #             }
-    #         )
-    #     else:
-    #         result = await agent.context.evaluate(
-    #             code,
-    #             parent_header={},
-    #         )
-
-    #         output = result.get("return")
-
-    #         return output
+        if JSON_OUTPUT:
+            return json.dumps(
+                {
+                    "action": "code_cell",
+                    "language": "python3",
+                    "content": code.strip(),
+                }
+            )
+        else:
+            result = await agent.context.evaluate(
+                code,
+                parent_header={},
+            )
+            return self.handle_response(result)
 
     @tool()
     async def set_input_dataset(
@@ -395,7 +418,7 @@ class BdfPzAgent(BaseAgent):
         Args:
             dataset_name (str): The name of the dataset that will be set as the input source.
         Returns:
-            str: returns the input source dataset as a palimpzest dataset called `dataset`.
+            str: returns the input source dataset (including the detected file type) as a palimpzest dataset called `dataset`.
         """
 
         code = agent.context.get_code(
@@ -421,42 +444,6 @@ class BdfPzAgent(BaseAgent):
                 parent_header={},
             )
             return self.handle_response(result)
-
-    # Doesn't seem to accomplish anything.
-    # @tool()
-    # async def pick_schema(self, schema_name: str, agent: AgentRef) -> str:  # noqa: F821
-    #     """
-    #     This function picks a given schema class given its name.
-    #     If the schema is not found, the function returns None. Provide a message to the user in this case, and proceed with creating a new schema with the given name.
-    #     Args:
-    #         schema_name (str): The name of the schema class to fetch.
-    #     Returns:
-    #         str: returns the schema class object that corresponds to the given schema name.
-    #     """
-
-    #     code = agent.context.get_code(
-    #         "pick_schema",
-    #         {"schema_name": schema_name},
-    #     )
-
-    #     if PRINT_OUTPUT:
-    #         print(code)
-    #     if JSON_OUTPUT:
-    #         return json.dumps(
-    #             {
-    #                 "action": "code_cell",
-    #                 "language": "python3",
-    #                 "content": code.strip(),
-    #             }
-    #         )
-    #     else:
-    #         result = await agent.context.evaluate(
-    #             code,
-    #             parent_header={},
-    #         )
-    #         output = result.get("return")
-
-    #         return output
 
     @tool()
     async def list_schemas(self, agent: AgentRef) -> str:
@@ -492,7 +479,6 @@ class BdfPzAgent(BaseAgent):
         self,
         output_dataset: str,
         policy_method: str,
-        allow_code_synth: str,
         agent: AgentRef,
         loop: LoopControllerRef,
     ) -> str:
@@ -504,13 +490,11 @@ class BdfPzAgent(BaseAgent):
 
         The policy method chosen is either to minimize the extraction cost or to maximize the quality
         of the extraction.
-        The allow_code_synth flag enables the system to use optimization strategies that involve running synthesized code.
         This returns the extractions as a Pandas DataFrame.
 
         Args:
             output_dataset (str): The dataset to execute the workload using.
             policy_method (str): Either "min_cost" or "max_quality". Defaults to "max_quality".
-            allow_code_synth (str): Whether to allow code synthesis or not. Defaults to "False".
 
         Returns:
             str: returns the extracted references as a Pandas DataFrame called `results_df`.
@@ -523,8 +507,7 @@ class BdfPzAgent(BaseAgent):
             "execute_workload",
             {
                 "output_dataset": output_dataset,
-                "policy_method": policy_method,
-                "allow_code_synth": allow_code_synth
+                "policy_method": policy_method
             },
         )
         if PRINT_OUTPUT:

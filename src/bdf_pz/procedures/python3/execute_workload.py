@@ -25,15 +25,14 @@ if preferred_models_str:
             validated_models.append(pz.constants.Model(model_id))
         except ValueError:
             logger.warning(
-                f"No Palimpzest model is registered with id '{model_id}' "
-                f"({ ', '.join([ m.value for m in pz.constants.Model ]) }). "
+                f"Warning: No Palimpzest model is registered with id '{model_id}' "
                 "This model will be ignored."
             )
     if len(validated_models) > 0:
         available_models = validated_models
     else:
         logger.warning(
-            "No models specified in PZ_PREFERRED_MODELS are registered in Palimpzest. "
+            "Warning: No models specified in PZ_PREFERRED_MODELS are registered in Palimpzest. "
             "Defaulting to any available model."
         )
 
@@ -42,7 +41,6 @@ config = pz.QueryProcessorConfig(
     cache=False,
     verbose=False,
     progress=False,
-    allow_code_synth="{{ allow_code_synth }}".lower() == "true",
     # RAG is currently hardcoded to use Model.TEXT_EMBEDDING_3_SMALL, so this must be disabled if the model is unavailable.
     # (See: https://github.com/mitdbg/palimpzest/blob/1.0.0/src/palimpzest/query/operators/rag.py#L26)
     allow_rag_reduction=(
