@@ -115,7 +115,7 @@ RUN python /extract-deps.py /jupyter/pyproject.toml \
     # Beaker-kernel requires `zmq` as a dependency but does not specify it in its `project.dependencies` list.
     pip install -v --no-cache-dir zmq && \
     rm requirements.txt
-RUN pip install -v -e "git+https://github.com/helxplatform/beaker-kernel.git@fix-fail-task#egg=beaker_kernel"
+RUN pip install -v -e "git+https://github.com/helxplatform/beaker-kernel.git@combined-fix-branch#egg=beaker_kernel"
 # All project dependencies are already installed by extract-deps, no need to reinstall the exact same list.
 RUN pip install -v --no-cache-dir --no-build-isolation --no-deps /jupyter
 

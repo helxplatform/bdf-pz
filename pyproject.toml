@@ -29,7 +29,7 @@ classifiers = [
 ]
 dependencies = [
   "archytas@git+https://github.com/helxplatform/archytas.git@combined-fix-branch",
-  "beaker_kernel@git+https://github.com/helxplatform/beaker-kernel.git@fix-fail-task",
+  "beaker_kernel@git+https://github.com/helxplatform/beaker-kernel.git@combined-fix-branch",
   "palimpzest@git+https://github.com/helxplatform/palimpzest.git@vllm-completion-bug",
   "cloudpickle==3.1.1",
   "pandas==2.3.3",
