@@ -10,4 +10,8 @@ if len(dataset_revisions) == 1:
 (current_dataset, removed_revision_action) = dataset_revisions.pop()
 # Backtrack the revision
 (dataset, backtracked_revision_action) = dataset_revisions[-1]
-f"Removed operation: {' '.join(f'"{ i }"' for i in removed_revision_action)}\nCurrent operation: {' '.join(f'"{ i }"' for i in backtracked_revision_action)}"
+(
+    f"Removed operation: {' '.join(f'"{ i }"' for i in removed_revision_action)}\n"
+    f"Current operation: {' '.join(f'"{ i }"' for i in backtracked_revision_action)}\n"
+    f"Current fields: { dataset.schema.schema()['properties'] }"
+)

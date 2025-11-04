@@ -64,18 +64,18 @@ Misc. preconfigured dataset setup...
 """
 
 # Represents a scientific research paper, which in practice is usually from a PDF file
-scientific_paper_schema = [
-    {"name": "paper_title", "type": str, "desc": "The title of the paper. This is a natural language title, not a number or letter."},
-    {"name": "author", "type": str, "desc": "The name of the first author of the paper"},
-    {"name": "abstract", "type": str, "desc": "A short description of the paper contributions and findings"},
-]
+# scientific_paper_schema = [
+#     {"name": "paper_title", "type": str, "desc": "The title of the paper. This is a natural language title, not a number or letter."},
+#     {"name": "author", "type": str, "desc": "The name of the first author of the paper"},
+#     {"name": "abstract", "type": str, "desc": "A short description of the paper contributions and findings"},
+# ]
 
-reference_schema = [
-    {"name": "index", "type": int, "desc": "The index of the reference in the paper."},
-    {"name": "title", "type": str, "desc": "The title of the paper being cited."},
-    {"name": "first_author", "type": str, "desc": "The author of the paper being cited."},
-    {"name": "year", "type": int, "desc": "The year in which the cited paper was published."},
-]
+# reference_schema = [
+#     {"name": "index", "type": int, "desc": "The index of the reference in the paper."},
+#     {"name": "title", "type": str, "desc": "The title of the paper being cited."},
+#     {"name": "first_author", "type": str, "desc": "The author of the paper being cited."},
+#     {"name": "year", "type": int, "desc": "The year in which the cited paper was published."},
+# ]
 
 DATA_PATH = "testdata/"
 
@@ -84,5 +84,8 @@ if os.path.isdir(DATA_PATH):
     for name in os.listdir(DATA_PATH):
         registered_datasets[name] = os.path.join(DATA_PATH, name)
 
-existing_schemas = {"ScientificPaper":scientific_paper_schema,
-                    "Reference":reference_schema}
+# existing_schemas = {"ScientificPaper":scientific_paper_schema,
+#                     "Reference":reference_schema}
+# It doesn't really make any sense to offer these precanned schemas
+# when the user can easily create what they need themselves.
+existing_schemas = {}

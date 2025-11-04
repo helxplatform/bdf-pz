@@ -223,7 +223,7 @@ class BdfPzAgent(BaseAgent):
         schema_name: str,
         field_names: list[str],
         field_descriptions: list[str],
-        field_types: list[str | int | float | bool],
+        field_types: list[str],
         agent: AgentRef,
         loop: LoopControllerRef
     ) -> str:
@@ -233,13 +233,13 @@ class BdfPzAgent(BaseAgent):
         After the schema is created, the input dataset should be converted to the new schema.
         This should be used when the user is interested in generating a new type of extraction schema. For example, let's say the user is interested in extracting parameter values from a set of scientific papers. The user can define the fields of the schema to be used for the extraction.
         In this case the schema name might be `Parameter` and the field information is passed in via three lists which must be constructed in proper order. For example, for parameter extractions the fields may be `name`, `value`, `unit`, `source`, etc.
-        You should provide a description for each field as well as whether the type of the field (str, int, etc.). These have to be in the same order as you provide the field names. Field names should not have spaces or special characters, but can have underscores.
+        You should provide a description for each field as well as the type of the field ("str", "int", "float", "bool"). These have to be in the same order as you provide the field names. Field names should not have spaces or special characters, but can have underscores.
 
         Args:
             schema_name (str): the name of the schema to add
             field_names (list[str]): a list of field names
             field_descriptions (list[str]): a list of field descriptions
-            field_types (list[str | int | float | bool]): a list of native Python types for the fields (also accepts elements of list[primitive])
+            field_types (list[str]): a list of strings representing Python types for the fields. Each element must be one of the literals "str", "bool", "int", or "float".
 
         Returns:
             str: the name of the new schema that was created
@@ -280,16 +280,24 @@ class BdfPzAgent(BaseAgent):
         filter_expression: str,
         agent: AgentRef,
         loop: LoopControllerRef,
+        computed_from: list[str] | None = None
     ) -> str:
         """
-        This function generates a filtered dataset given an input dataset and a filtering expression. The filter expression is a string that describes a condition that has to be satisfied for each of the data item in the dataset. For example if a user is interested in a dataset of scientific papers and wants to only keep papers that are published in the year 2022, the filter expression might be "The papers is published in 2022".
+        This function generates a filtered dataset given an input dataset and a filtering expression.
+        The filter expression is a string that describes a condition that has to be satisfied for each of the data item in the dataset.
+        The computed_from field can be used to filter against a subset of each data item's fields rather than using the entirety of each item. Use None to filter against all fields.
+        If there is ANY ambiguity regarding which fields the filter should be computed using, THEN THIS SHOULD BE `NONE`, which will filter against all of each item's fields.
+        For example if a user is interested in a dataset of scientific papers and wants to only keep papers that are published in the year 2022, the filter expression might be "The papers is published in 2022". If a publication_date field exists on the dataset, then you might specify computed_from=["publication_date"].
 
         Args:
             input_dataset (str): The input Dataset to use for the filtering.
             filter_expression (str): A string that describes a condition in natural language that can be used to filter out data points within a collection.
-
+            computed_from (list[str], optional): A subset of input field(s) to apply the filter against. Defaults to None, which will filter against all of the item's fields. 
+            
         Returns:
-            str: returns a new dataset corresponding to the filtered input dataset.
+            str: returns a new dataset corresponding to the filtered input dataset on line 1, and a schema for its fields on line 2.
+        
+        You should show the user the filter you used and what fields it is computed from (all fields if None) after this function runs.
         """
 
         code = agent.context.get_code(
@@ -297,6 +305,7 @@ class BdfPzAgent(BaseAgent):
             {
                 "input_dataset": input_dataset,
                 "filter_expression": filter_expression,
+                "computed_from": computed_from if computed_from else None
             },
         )
         if PRINT_OUTPUT:
@@ -326,24 +335,29 @@ class BdfPzAgent(BaseAgent):
         cardinality: str,
         agent: AgentRef,
         loop: LoopControllerRef,
+        computed_from: list[str] | None = None
     ) -> str:
         """
         This function creates an output dataset by augmenting an input dataset with a specific schema.
         The function has to be used to extract any information from a collection of input documents.
         The function is typically needed before executing a workload, to apply a generated schema to an existing dataset.
-        If there is not an applicable schema, an appropriate schema should be generated using the create_schema tool.
         If the schema object can be extracted multiple times from a single object of the input dataset, the cardinality should be set to "one_to_many". If the schema can only be extracted once from a single object of the input dataset, the cardinality should be set to "one_to_one".
-        For example if a user wants to extract the titles for a dataset of scientific papers, the schema might be a TitleSchema, and the cardinality would be one_to_one.
+        The computed_from field can be used to specify a subset of the dataset's fields to use to compute the output schema, rather than computing the schema against the entirety of each input item.
+        If there is ambiguity regarding which fields are required to compute the schema, then this should be None. Leaving as None will require more computational effort, which is OK.
+        For example if a user wants to extract the titles for a dataset of scientific papers, the schema might be a TitleSchema, and the cardinality would be one_to_one. There would be no computed_from specified.
+        For example, if a user wants to translate the abstracts for a dataset of scientific papers, and an "abstract" field already exists on the dataset, then the schema might be a TranslateAbstract, the cardinality would be one_to_one, and the computed_from field would be ["abstract"].
 
 
         Args:
             input_dataset (str): An existing object of type dataset to use for conversion.
             schema_name (str): The name of a schema from the ones existing in the system that describes the object of the new converted dataset.
             cardinality (str): The cardinality of the conversion. Either "one_to_one" or "one_to_many".
-
+            computed_from (list[str], optional): A subset of input field(s) used to compute the output schema. This should be used to save time when the fields required to compute the schema are already defined on the input dataset. Defaults to None, which will use all fields to compute the output schema. 
+            
         Returns:
-            str: returns a new dataset corresponding to the converted input dataset.
+            str: returns a new dataset corresponding to the converted input dataset on line 1, and a schema for its fields on line 2.
 
+        You should show the user the fields of the new dataset, and the value of computed_from if specified. 
         """
 
         code = agent.context.get_code(
@@ -352,6 +366,7 @@ class BdfPzAgent(BaseAgent):
                 "input_dataset": input_dataset,
                 "schema_name": schema_name,
                 "cardinality": cardinality,
+                "computed_from": computed_from if computed_from else None
             },
         )
         if PRINT_OUTPUT:
@@ -373,6 +388,37 @@ class BdfPzAgent(BaseAgent):
 
             return self.handle_response(result)
         
+    @tool
+    async def retrieve_current_dataset_fields(
+        self, agent: AgentRef, loop: LoopControllerRef
+    ) -> str:
+        """
+        This function returns a schema for the current fields available on the active dataset.
+        This function may be used when deciding how to specify a `computed_from` argument on a filter/convert operation to confirm the input fields for the operation.
+        For example, if a user is converting the dataset using a TranslatePaper schema which includes 2 fields to translate the paper's abstract and body, you may want to check for the existence of these fields on the dataset.
+        
+        Returns:
+            str: a dict representation of the schema for the current fields on the active dataset.
+        """
+        code = agent.context.get_code("retrieve_current_dataset_fields", {})
+        if PRINT_OUTPUT:
+            print(code)
+
+        if JSON_OUTPUT:
+            return json.dumps(
+                {
+                    "action": "code_cell",
+                    "language": "python3",
+                    "content": code.strip(),
+                }
+            )
+        else:
+            result = await agent.context.evaluate(
+                code,
+                parent_header={},
+            )
+            return self.handle_response(result)
+        
     @tool()
     async def backtrack_dataset_operation(
         self, agent: AgentRef, loop: LoopControllerRef
@@ -383,7 +429,7 @@ class BdfPzAgent(BaseAgent):
         For example, if a user asks you to filter the dataset but then dislikes the filter you used, they may ask you to undo the filter, which can be done using this tool.
         
         Returns:
-            str: returns the removed dataset operation and its arguments on line 1, and the current dataset operation and its arguments on line 2.
+            str: returns the removed dataset operation and its arguments on line 1, the current dataset operation and its arguments on line 2, and a schema for its fields on line 3.
         """
         code = agent.context.get_code("backtrack_dataset_operation", {})
         if PRINT_OUTPUT:
@@ -418,7 +464,7 @@ class BdfPzAgent(BaseAgent):
         Args:
             dataset_name (str): The name of the dataset that will be set as the input source.
         Returns:
-            str: returns the input source dataset (including the detected file type) as a palimpzest dataset called `dataset`.
+            str: returns the input source dataset (including the detected file type) as a palimpzest dataset called `dataset` on line 1, and a schema for its fields on line 2.
         """
 
         code = agent.context.get_code(
@@ -549,6 +595,47 @@ class BdfPzAgent(BaseAgent):
         code = agent.context.get_code(
             "print_statistics",
             {},
+        )
+
+        if JSON_OUTPUT:
+            return json.dumps(
+                {
+                    "action": "code_cell",
+                    "language": "python3",
+                    "content": code.strip(),
+                }
+            )
+        else:
+            result = await agent.context.evaluate(
+                code,
+                parent_header={},
+            )
+            return self.handle_response(result)
+        
+    @tool
+    async def save_workload_results(
+        self,
+        output_path: str,
+        agent: AgentRef
+    ) -> str:
+        """
+        This function saves the results dataframe after executing a workload.
+        This can be used if the user wants to save the results to their filesystem.
+        The workload must be executed before using this tool to save its results.
+        You should default to CSV format unless the user specifies otherwise.
+
+        Args:
+            output_path (str): The path to save the dataset to. Supported file extensions include csv, json, parquet, feather, XLSX/XLS, HTML, and tex.
+        
+        Returns:
+            str: written file size in bytes.
+        """
+
+        code = agent.context.get_code(
+            "save_workload_results",
+            {
+                "output_path": output_path
+            },
         )
 
         if JSON_OUTPUT:

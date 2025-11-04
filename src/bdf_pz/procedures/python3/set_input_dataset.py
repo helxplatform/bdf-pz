@@ -53,4 +53,4 @@ dataset_revisions = [
     (dataset, ("set_input_dataset", dataset_name))
 ]
 
-dataset
+f"Dataset: { repr(dataset) }\nFields: { dataset.schema.schema()['properties'] }"
