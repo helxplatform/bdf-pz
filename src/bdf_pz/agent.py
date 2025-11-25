@@ -430,6 +430,8 @@ class BdfPzAgent(BaseAgent):
         
         Returns:
             str: returns the removed dataset operation and its arguments on line 1, the current dataset operation and its arguments on line 2, and a schema for its fields on line 3.
+
+        You should show the user the current dataset operation after the most recent operation has been removed.
         """
         code = agent.context.get_code("backtrack_dataset_operation", {})
         if PRINT_OUTPUT:
