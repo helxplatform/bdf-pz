@@ -1,4 +1,5 @@
 import os
+from bdf_pz.multimodal_dataset import MultimodalDataset
 
 dataset_name = "{{ dataset_name }}"
 dataset_path = registered_datasets[dataset_name]
@@ -32,12 +33,9 @@ for file in os.listdir(dataset_path):
 DatasetClass = None
 if found_dataclasses:
     if len(found_dataclasses) > 1:
-        cls_names = [cls.__name__ for cls in found_dataclasses]
-        raise ValueError(
-            f"Mixed dataset types detected: { ', '.join(cls_names) }. "
-            "Only unimodal datasets are currently supported."
-        )
-    DatasetClass = list(found_dataclasses)[0]
+        DatasetClass = MultimodalDataset
+    else:
+        DatasetClass = list(found_dataclasses)[0]
 else:
     # If the dataset file extensions are unrecognized, assume they are textual in nature.
     logger.warning(
